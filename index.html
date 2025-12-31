@@ -1,179 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Kingdom Mint Factory</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8">
+<title>Kingdom Mint Factory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
 
-  <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
 
-    body {
-      font-family: 'Orbitron', sans-serif;
-      background: radial-gradient(circle at top, #1a0030 0%, #050008 70%);
-      color: #fff;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+body{
+  font-family:'Orbitron',sans-serif;
+  background:#050008;
+  color:#fff;
+}
 
-    .container {
-      width: 100%;
-      max-width: 1200px;
-      padding: 80px 20px;
-      text-align: center;
-    }
+/* ===== BACKGROUND ===== */
+.page-bg{
+  background:
+    radial-gradient(circle at center,#240044 0%,#050008 70%);
+  min-height:100vh;
+  padding:60px 16px;
+}
 
-    h1 {
-      font-size: clamp(2.5rem, 5vw, 3.8rem);
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      margin-bottom: 14px;
-    }
+/* ===== TOP LINKS ===== */
+.top-links{
+  position:fixed;
+  top:20px;
+  right:20px;
+  display:flex;
+  gap:18px;
+  z-index:99;
+}
+.top-links a{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:12px;
+  color:#bfa8ff;
+  text-decoration:none;
+}
+.top-links img{
+  height:20px;
+}
 
-    .subtitle {
-      color: #cbb9ff;
-      max-width: 720px;
-      margin: 0 auto 70px;
-      line-height: 1.7;
-      font-size: 1rem;
-    }
+/* ===== HERO IMAGE ===== */
+.hero{
+  max-width:1000px;
+  margin:0 auto 80px;
+  text-align:center;
+}
+.hero img{
+  width:100%;
+  max-width:900px;
+}
 
-    /* ===== LED COUNTDOWN ===== */
+/* ===== STEALTH MODE ===== */
+.stealth{
+  text-align:center;
+  margin-bottom:90px;
+}
+.stealth h2{
+  font-size:32px;
+  letter-spacing:3px;
+  color:#d4c1ff;
+  margin-bottom:14px;
+}
+.stealth p{
+  color:#9f8ee6;
+  font-size:14px;
+  margin-bottom:28px;
+}
 
-    .countdown-shell {
-      max-width: 950px;
-      margin: 0 auto;
-      padding: 28px 30px 32px;
-      background: linear-gradient(180deg, #050505, #000);
-      border-radius: 12px;
-      border: 3px solid #1f1f1f;
-      box-shadow:
-        inset 0 0 30px rgba(255, 0, 0, 0.25),
-        0 0 60px rgba(0, 0, 0, 0.9);
-    }
+/* ===== LED COUNTDOWN ===== */
+.countdown-shell{
+  max-width:900px;
+  margin:0 auto;
+  padding:26px 30px;
+  background:linear-gradient(180deg,#070707,#000);
+  border-radius:12px;
+  border:3px solid #1f1f1f;
+  box-shadow:inset 0 0 25px rgba(255,0,0,.25),0 0 40px #000;
+}
+.countdown-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:22px;
+  text-align:center;
+}
+.cd-label{
+  font-size:13px;
+  letter-spacing:2px;
+  margin-bottom:6px;
+}
+.cd-value{
+  font-size:58px;
+  color:#ff1e1e;
+  text-shadow:0 0 8px rgba(255,30,30,.9),0 0 16px rgba(255,30,30,.6);
+}
 
-    .countdown-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-    }
+/* ===== STATUS ===== */
+.status{
+  max-width:1000px;
+  margin:100px auto 70px;
+  background:linear-gradient(180deg,#0b0620,#060012);
+  border-radius:18px;
+  padding:30px;
+  box-shadow:0 0 30px rgba(90,40,200,.25);
+}
+.status h3{
+  color:#ffd86b;
+  margin-bottom:18px;
+}
+.status-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  gap:18px;
+}
+.status-item{
+  background:#0e0828;
+  padding:16px;
+  border-radius:12px;
+  font-size:13px;
+  color:#cfc3ff;
+}
 
-    .countdown-label {
-      font-size: 14px;
-      letter-spacing: 2px;
-      color: #ffffff;
-      margin-bottom: 6px;
-    }
+/* ===== CONTENT ===== */
+.section{
+  max-width:1000px;
+  margin:0 auto 60px;
+  background:#0b0620;
+  padding:28px;
+  border-radius:18px;
+}
+.section h3{
+  color:#ffd86b;
+  margin-bottom:12px;
+}
+.section p{
+  color:#b9aaff;
+  font-size:14px;
+  line-height:1.7;
+}
 
-    .countdown-value {
-      font-size: 64px;
-      color: #ff1e1e;
-      text-shadow:
-        0 0 6px rgba(255, 30, 30, 0.9),
-        0 0 14px rgba(255, 30, 30, 0.6);
-    }
-
-    /* LED flicker */
-    @keyframes flicker {
-      0%, 100% { opacity: 1; }
-      48% { opacity: 0.97; }
-      50% { opacity: 0.9; }
-      52% { opacity: 1; }
-    }
-
-    .countdown-value {
-      animation: flicker 3.5s infinite;
-    }
-
-    /* Mobile */
-    @media (max-width: 768px) {
-      .countdown-value {
-        font-size: 38px;
-      }
-
-      .countdown-label {
-        font-size: 11px;
-      }
-    }
-
-    footer {
-      margin-top: 70px;
-      font-size: 0.75rem;
-      color: #777;
-    }
-  </style>
+/* MOBILE */
+@media(max-width:768px){
+  .cd-value{font-size:36px}
+}
+</style>
 </head>
+
 <body>
+<div class="page-bg">
 
-  <div class="container">
-    <h1>Kingdom Mint Factory</h1>
-    <p class="subtitle">
-      The factory is sealed in stealth mode.  
-      Systems are aligning for first production.
-    </p>
+<!-- TOP LINKS -->
+<div class="top-links">
+  <a href="https://x.com/SolNerdKing" target="_blank">
+    <img src="x-logo.svg">x.com/SolNerdKing
+  </a>
+  <a href="http://t.me/solnerdkingdom" target="_blank">
+    <img src="telegram-logo.svg">t.me/solnerdkingdom
+  </a>
+</div>
 
-    <!-- Countdown -->
-    <div class="countdown-shell">
-      <div class="countdown-grid">
-        <div>
-          <div class="countdown-label">DAYS</div>
-          <div class="countdown-value" id="days">00</div>
-        </div>
-        <div>
-          <div class="countdown-label">HOURS</div>
-          <div class="countdown-value" id="hours">00</div>
-        </div>
-        <div>
-          <div class="countdown-label">MINUTES</div>
-          <div class="countdown-value" id="minutes">00</div>
-        </div>
-        <div>
-          <div class="countdown-label">SECONDS</div>
-          <div class="countdown-value" id="seconds">00</div>
-        </div>
-      </div>
+<!-- HERO -->
+<div class="hero">
+  <img src="kingdom-factory.png" alt="Kingdom Mint Factory">
+</div>
+
+<!-- STEALTH MODE -->
+<div class="stealth">
+  <h2>STEALTH MODE</h2>
+  <p>Pre-deployment transparency stage</p>
+
+  <div class="countdown-shell">
+    <div class="countdown-grid">
+      <div><div class="cd-label">DAYS</div><div class="cd-value" id="d">00</div></div>
+      <div><div class="cd-label">HOURS</div><div class="cd-value" id="h">00</div></div>
+      <div><div class="cd-label">MINUTES</div><div class="cd-value" id="m">00</div></div>
+      <div><div class="cd-label">SECONDS</div><div class="cd-value" id="s">00</div></div>
     </div>
-
-    <footer>
-      © 2025 Kingdom Mint Factory
-    </footer>
   </div>
+</div>
 
-  <script>
-    // SET LAUNCH DATE
-    const launchDate = new Date("January 1, 2026 12:00:00 CST").getTime();
+<!-- STATUS -->
+<div class="status">
+<h3>Status</h3>
+<div class="status-grid">
+  <div class="status-item">Status<br>Pending on-chain deployment</div>
+  <div class="status-item">Network<br>Solana</div>
+  <div class="status-item">Token Name<br>Revealed at launch</div>
+  <div class="status-item">Ticker<br>To Be Announced</div>
+  <div class="status-item">Contract<br>Revealed post-deployment</div>
+  <div class="status-item">Token Link<br>To Be Announced</div>
+  <div class="status-item">Developer Wallet<br>To Be Disclosed</div>
+  <div class="status-item">Developer Profile<br>To Be Announced</div>
+</div>
+</div>
 
-    function pad(n) {
-      return n.toString().padStart(2, "0");
-    }
+<!-- CONTENT -->
+<div class="section">
+<h3>The First Coin</h3>
+<p>
+This deployment marks the genesis of a longer experiment — a Kingdom Mint Factory
+designed to release one coin per day for 365 days.
+</p>
+</div>
 
-    setInterval(() => {
-      const now = Date.now();
-      const diff = launchDate - now;
-      if (diff <= 0) return;
+<div class="section">
+<h3>Launch Venue</h3>
+<p>
+Minted and traded via Pump.fun.  
+Launch link revealed at deployment.
+</p>
+</div>
 
-      document.getElementById("days").textContent =
-        pad(Math.floor(diff / (1000 * 60 * 60 * 24)));
+</div>
 
-      document.getElementById("hours").textContent =
-        pad(Math.floor((diff / (1000 * 60 * 60)) % 24));
-
-      document.getElementById("minutes").textContent =
-        pad(Math.floor((diff / (1000 * 60)) % 60));
-
-      document.getElementById("seconds").textContent =
-        pad(Math.floor((diff / 1000) % 60));
-    }, 1000);
-  </script>
+<script>
+const launch = new Date("January 1, 2026 12:00:00 CST").getTime();
+setInterval(()=>{
+  const now=Date.now();
+  const diff=launch-now;
+  if(diff<=0)return;
+  d.textContent=Math.floor(diff/86400000);
+  h.textContent=Math.floor(diff/3600000)%24;
+  m.textContent=Math.floor(diff/60000)%60;
+  s.textContent=Math.floor(diff/1000)%60;
+},1000);
+</script>
 
 </body>
 </html>
