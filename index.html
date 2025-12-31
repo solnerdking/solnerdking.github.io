@@ -2,74 +2,84 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Stealth Mode — Pre-Deployment Transparency</title>
+  <title>STEALTH MODE</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- Google Font -->
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <!-- Premium Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg-dark: #070b1a;
-      --glass: rgba(255,255,255,0.06);
-      --border: rgba(255,255,255,0.12);
-      --neon: #9b7cff;
-      --accent: #00f6ff;
-      --gold: #f5c77a;
-      --text: #e6e9ff;
-      --muted: #9aa0d1;
+      --neon-purple: #b48cff;
+      --neon-cyan: #3cf2ff;
+      --gold: #f6d58e;
+      --bg-dark: #050714;
+      --glass: rgba(255,255,255,0.08);
+      --border: rgba(255,255,255,0.18);
+      --text: #f1f3ff;
+      --muted: #a9aedf;
     }
 
     * { box-sizing: border-box; }
 
     body {
       margin: 0;
-      font-family: 'Inter', sans-serif;
+      background: var(--bg-dark);
       color: var(--text);
-      background:
-        radial-gradient(circle at top, rgba(155,124,255,0.15), transparent 60%),
-        #050713;
+      font-family: 'Space Grotesk', sans-serif;
     }
 
-    /* HERO */
+    /* HERO BACKGROUND */
     .hero {
       min-height: 100vh;
-      background: 
-        linear-gradient(to bottom, rgba(5,7,19,0.65), rgba(5,7,19,0.95)),
-        url("stealth-hero.png") center/cover no-repeat;
+      background:
+        radial-gradient(circle at center, rgba(180,140,255,0.35), transparent 55%),
+        linear-gradient(to bottom, rgba(5,7,20,0.25), rgba(5,7,20,0.85)),
+        url("stealth-hero.png") center center / cover no-repeat;
+      display: flex;
+      align-items: center;
       padding: 80px 20px;
     }
 
     .container {
       max-width: 1100px;
       margin: auto;
+      width: 100%;
     }
 
     h1 {
       font-family: 'Orbitron', sans-serif;
-      font-size: clamp(2.5rem, 5vw, 4rem);
       text-align: center;
-      letter-spacing: 0.08em;
-      text-shadow: 0 0 25px rgba(155,124,255,0.6);
+      font-size: clamp(2.8rem, 6vw, 4.5rem);
+      letter-spacing: 0.12em;
       margin-bottom: 10px;
+      text-shadow:
+        0 0 25px rgba(180,140,255,0.9),
+        0 0 60px rgba(60,242,255,0.5);
     }
 
     .subtitle {
       text-align: center;
+      font-size: 1.1rem;
       color: var(--muted);
       margin-bottom: 50px;
-      font-size: 1.1rem;
     }
 
-    /* GLASS CARDS */
+    /* GLASS CARD */
     .card {
-      background: var(--glass);
+      background: linear-gradient(
+        160deg,
+        rgba(255,255,255,0.12),
+        rgba(255,255,255,0.02)
+      );
       border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 26px;
+      border-radius: 20px;
+      padding: 28px;
       margin-bottom: 30px;
-      backdrop-filter: blur(14px);
-      box-shadow: 0 0 30px rgba(0,0,0,0.4);
+      backdrop-filter: blur(18px) saturate(160%);
+      box-shadow:
+        0 0 40px rgba(0,0,0,0.6),
+        inset 0 0 25px rgba(180,140,255,0.12);
     }
 
     .grid {
@@ -79,19 +89,20 @@
     }
 
     .label {
+      font-size: 0.85rem;
       color: var(--muted);
-      font-size: 0.9rem;
     }
 
     .value {
       font-weight: 600;
-      margin-top: 4px;
+      margin-top: 6px;
     }
 
     h2 {
       font-family: 'Orbitron', sans-serif;
       color: var(--gold);
-      margin-bottom: 12px;
+      letter-spacing: 0.05em;
+      margin-bottom: 14px;
     }
 
     ul {
@@ -107,37 +118,51 @@
       display: grid;
       grid-template-columns: repeat(4,1fr);
       gap: 15px;
-      margin-top: 30px;
+      margin-top: 20px;
       text-align: center;
     }
 
     .time {
-      background: linear-gradient(145deg, rgba(155,124,255,0.15), rgba(0,0,0,0.4));
-      border: 1px solid var(--border);
-      border-radius: 14px;
       padding: 18px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background:
+        linear-gradient(145deg, rgba(180,140,255,0.25), rgba(0,0,0,0.6));
       font-family: 'Orbitron', sans-serif;
-      box-shadow: inset 0 0 25px rgba(155,124,255,0.15);
+      box-shadow: inset 0 0 25px rgba(60,242,255,0.25);
     }
 
     .time span {
-      font-size: 2rem;
       display: block;
-      color: var(--accent);
+      font-size: 2.2rem;
+      color: var(--neon-cyan);
+    }
+
+    /* COMMUNITY ICONS */
+    .community {
+      display: flex;
+      justify-content: center;
+      gap: 28px;
+      margin-top: 10px;
+    }
+
+    .icon {
+      width: 42px;
+      height: 42px;
+      fill: var(--neon-cyan);
+      transition: transform 0.25s ease, filter 0.25s ease;
+    }
+
+    .icon:hover {
+      transform: scale(1.15);
+      filter: drop-shadow(0 0 12px var(--neon-cyan));
     }
 
     .footer {
       text-align: center;
       margin-top: 60px;
-      color: var(--muted);
       font-size: 0.85rem;
-    }
-
-    .links a {
-      color: var(--accent);
-      text-decoration: none;
-      margin: 0 10px;
-      font-weight: 600;
+      color: var(--muted);
     }
 
     @media (max-width: 600px) {
@@ -157,37 +182,22 @@
 
       <!-- STATUS -->
       <div class="card grid">
-        <div>
-          <div class="label">Status</div>
-          <div class="value">Pending on-chain deployment</div>
-        </div>
-        <div>
-          <div class="label">Network</div>
-          <div class="value">Solana</div>
-        </div>
-        <div>
-          <div class="label">Token Name</div>
-          <div class="value">Revealed at launch</div>
-        </div>
-        <div>
-          <div class="label">Ticker</div>
-          <div class="value">TBA</div>
-        </div>
-        <div>
-          <div class="label">Contract</div>
-          <div class="value">Revealed post-deployment</div>
-        </div>
+        <div><div class="label">Status</div><div class="value">Pending on-chain deployment</div></div>
+        <div><div class="label">Network</div><div class="value">Solana</div></div>
+        <div><div class="label">Token Name</div><div class="value">Revealed at launch</div></div>
+        <div><div class="label">Ticker</div><div class="value">TBA</div></div>
+        <div><div class="label">Contract</div><div class="value">Revealed post-deployment</div></div>
       </div>
 
       <!-- NARRATIVE -->
       <div class="card">
         <h2>The First Coin</h2>
         <p>
-          This deployment marks the genesis of a larger experiment — a structured mint system
-          designed for fair access, visible on-chain activity, and organic discovery.
+          This deployment marks the genesis of a structured mint experiment —
+          focused on fair access, visible on-chain activity, and organic discovery.
         </p>
         <p>
-          This is not a one-off launch. It is the foundation for a sequence.
+          This is the first signal, not the end state.
         </p>
       </div>
 
@@ -207,21 +217,21 @@
       <div class="card">
         <h2>Launch Venue</h2>
         <p>
-          This token will be minted and traded via <strong>Pump.fun</strong> on Solana.<br />
-          The official mint link will be revealed at launch.
+          Minted and traded via <strong>Pump.fun</strong> on Solana.<br>
+          Official link revealed at launch.
         </p>
       </div>
 
       <!-- COUNTDOWN -->
       <div class="card">
         <h2>Launch Countdown</h2>
-        <div class="countdown" id="countdown">
+        <div class="countdown">
           <div class="time"><span id="d">0</span>Days</div>
           <div class="time"><span id="h">0</span>Hours</div>
           <div class="time"><span id="m">0</span>Minutes</div>
           <div class="time"><span id="s">0</span>Seconds</div>
         </div>
-        <p style="text-align:center;margin-top:12px;color:var(--muted);">
+        <p style="text-align:center;color:var(--muted);margin-top:12px;">
           Launch: Jan 1 · 12:00 PM CST
         </p>
       </div>
@@ -229,9 +239,20 @@
       <!-- COMMUNITY -->
       <div class="card">
         <h2>Community</h2>
-        <div class="links">
-          <a href="#" target="_blank">Telegram</a>
-          <a href="#" target="_blank">X (Twitter)</a>
+        <div class="community">
+          <!-- Telegram -->
+          <a href="#" target="_blank" aria-label="Telegram">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path d="M9.04 15.86l-.38 5.32c.54 0 .77-.23 1.05-.5l2.52-2.42 5.23 3.82c.96.53 1.64.25 1.9-.89l3.45-16.21c.31-1.39-.5-1.94-1.44-1.6L1.64 9.63c-1.35.53-1.33 1.3-.24 1.64l4.9 1.53L17.7 6.3c.54-.33 1.04-.15.63.21"/>
+            </svg>
+          </a>
+
+          <!-- X -->
+          <a href="#" target="_blank" aria-label="X">
+            <svg class="icon" viewBox="0 0 24 24">
+              <path d="M18.36 2H21l-7.2 8.23L22 22h-6.6l-5.17-6.77L4.1 22H1.45l7.7-8.8L2 2h6.76l4.67 6.2z"/>
+            </svg>
+          </a>
         </div>
       </div>
 
@@ -244,17 +265,14 @@
 
   <script>
     const launch = new Date("January 1, 2026 12:00:00 CST").getTime();
-
     setInterval(() => {
-      const now = new Date().getTime();
+      const now = Date.now();
       const diff = launch - now;
-
       if (diff < 0) return;
-
-      document.getElementById("d").innerText = Math.floor(diff / (1000*60*60*24));
-      document.getElementById("h").innerText = Math.floor((diff / (1000*60*60)) % 24);
-      document.getElementById("m").innerText = Math.floor((diff / (1000*60)) % 60);
-      document.getElementById("s").innerText = Math.floor((diff / 1000) % 60);
+      d.innerText = Math.floor(diff / (1000*60*60*24));
+      h.innerText = Math.floor((diff / (1000*60*60)) % 24);
+      m.innerText = Math.floor((diff / (1000*60)) % 60);
+      s.innerText = Math.floor((diff / 1000) % 60);
     }, 1000);
   </script>
 </body>
