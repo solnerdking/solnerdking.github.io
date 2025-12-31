@@ -1,245 +1,261 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" />
+  <title>Stealth Mode — Pre-Deployment Transparency</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-<title>Stealth Deployment</title>
+  <!-- Google Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-dark: #070b1a;
+      --glass: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.12);
+      --neon: #9b7cff;
+      --accent: #00f6ff;
+      --gold: #f5c77a;
+      --text: #e6e9ff;
+      --muted: #9aa0d1;
+    }
 
-<style>
-:root {
-  --bg-main: #060817;
-  --bg-glass: rgba(18, 22, 55, 0.55);
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --glow: rgba(124, 92, 255, 0.25);
+    * { box-sizing: border-box; }
 
-  --text-main: #e8e9ff;
-  --text-muted: #a4a6d9;
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top, rgba(155,124,255,0.15), transparent 60%),
+        #050713;
+    }
 
-  --accent-gold: #ffcc66;
-  --accent-cyan: #7ffcff;
-}
+    /* HERO */
+    .hero {
+      min-height: 100vh;
+      background: 
+        linear-gradient(to bottom, rgba(5,7,19,0.65), rgba(5,7,19,0.95)),
+        url("stealth-hero.png") center/cover no-repeat;
+      padding: 80px 20px;
+    }
 
-* {
-  box-sizing: border-box;
-}
+    .container {
+      max-width: 1100px;
+      margin: auto;
+    }
 
-body {
-  margin: 0;
-  font-family: Inter, sans-serif;
-  background:
-    radial-gradient(circle at top, #14194a, var(--bg-main)),
-    linear-gradient(180deg, #050611, #07091d);
-  color: var(--text-main);
-}
+    h1 {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      text-align: center;
+      letter-spacing: 0.08em;
+      text-shadow: 0 0 25px rgba(155,124,255,0.6);
+      margin-bottom: 10px;
+    }
 
-/* Layout */
-.container {
-  max-width: 960px;
-  margin: auto;
-  padding: 80px 20px 60px;
-}
+    .subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 50px;
+      font-size: 1.1rem;
+    }
 
-/* Hero */
-.hero {
-  text-align: center;
-  margin-bottom: 60px;
-}
+    /* GLASS CARDS */
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 26px;
+      margin-bottom: 30px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 0 30px rgba(0,0,0,0.4);
+    }
 
-.hero img {
-  width: 100%;
-  max-width: 820px;
-  border-radius: 18px;
-  box-shadow: 0 0 60px var(--glow);
-  margin-bottom: 40px;
-}
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+      gap: 20px;
+    }
 
-.hero h1 {
-  font-family: Orbitron, sans-serif;
-  letter-spacing: 4px;
-  margin-bottom: 8px;
-}
+    .label {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
 
-.subtitle {
-  color: var(--text-muted);
-  margin-bottom: 32px;
-}
+    .value {
+      font-weight: 600;
+      margin-top: 4px;
+    }
 
-/* Countdown */
-.countdown {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  flex-wrap: wrap;
-}
+    h2 {
+      font-family: 'Orbitron', sans-serif;
+      color: var(--gold);
+      margin-bottom: 12px;
+    }
 
-.time-box {
-  width: 110px;
-  padding: 16px;
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
-  border-radius: 14px;
-  backdrop-filter: blur(12px);
-  box-shadow: 0 0 30px var(--glow);
-}
+    ul {
+      padding-left: 18px;
+    }
 
-.time-box span {
-  font-family: Orbitron, sans-serif;
-  font-size: 2rem;
-  color: var(--accent-cyan);
-}
+    li {
+      margin-bottom: 8px;
+    }
 
-.time-box div {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-}
+    /* COUNTDOWN */
+    .countdown {
+      display: grid;
+      grid-template-columns: repeat(4,1fr);
+      gap: 15px;
+      margin-top: 30px;
+      text-align: center;
+    }
 
-/* Panels */
-.panel {
-  background: var(--bg-glass);
-  border: 1px solid var(--border-glass);
-  border-radius: 18px;
-  padding: 28px;
-  margin-bottom: 28px;
-  backdrop-filter: blur(14px);
-  box-shadow:
-    inset 0 0 0.5px rgba(255,255,255,0.15),
-    0 0 40px rgba(0,0,0,0.5);
-}
+    .time {
+      background: linear-gradient(145deg, rgba(155,124,255,0.15), rgba(0,0,0,0.4));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      font-family: 'Orbitron', sans-serif;
+      box-shadow: inset 0 0 25px rgba(155,124,255,0.15);
+    }
 
-.panel h2 {
-  font-family: Orbitron, sans-serif;
-  color: var(--accent-gold);
-  margin-bottom: 12px;
-}
+    .time span {
+      font-size: 2rem;
+      display: block;
+      color: var(--accent);
+    }
 
-/* Status grid */
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
-}
+    .footer {
+      text-align: center;
+      margin-top: 60px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
 
-.status-item {
-  background: rgba(10, 12, 35, 0.6);
-  border-radius: 12px;
-  padding: 14px;
-  border: 1px solid var(--border-glass);
-  font-size: 0.9rem;
-}
+    .links a {
+      color: var(--accent);
+      text-decoration: none;
+      margin: 0 10px;
+      font-weight: 600;
+    }
 
-/* Links */
-.links a {
-  color: var(--accent-cyan);
-  margin-right: 20px;
-  text-decoration: none;
-}
-
-/* Footer */
-footer {
-  text-align: center;
-  font-size: 0.75rem;
-  color: #777;
-  margin-top: 60px;
-}
-</style>
+    @media (max-width: 600px) {
+      .countdown {
+        grid-template-columns: repeat(2,1fr);
+      }
+    }
+  </style>
 </head>
 
 <body>
+  <section class="hero">
+    <div class="container">
 
-<div class="container">
+      <h1>STEALTH MODE</h1>
+      <div class="subtitle">Pre-deployment transparency page</div>
 
-  <!-- HERO -->
-  <div class="hero">
-    <img src="stealth-hero.png" alt="Stealth Graphic">
+      <!-- STATUS -->
+      <div class="card grid">
+        <div>
+          <div class="label">Status</div>
+          <div class="value">Pending on-chain deployment</div>
+        </div>
+        <div>
+          <div class="label">Network</div>
+          <div class="value">Solana</div>
+        </div>
+        <div>
+          <div class="label">Token Name</div>
+          <div class="value">Revealed at launch</div>
+        </div>
+        <div>
+          <div class="label">Ticker</div>
+          <div class="value">TBA</div>
+        </div>
+        <div>
+          <div class="label">Contract</div>
+          <div class="value">Revealed post-deployment</div>
+        </div>
+      </div>
 
-    <h1>STEALTH MODE</h1>
-    <div class="subtitle">Pre-deployment transparency page</div>
+      <!-- NARRATIVE -->
+      <div class="card">
+        <h2>The First Coin</h2>
+        <p>
+          This deployment marks the genesis of a larger experiment — a structured mint system
+          designed for fair access, visible on-chain activity, and organic discovery.
+        </p>
+        <p>
+          This is not a one-off launch. It is the foundation for a sequence.
+        </p>
+      </div>
 
-    <div class="countdown">
-      <div class="time-box"><span id="d">0</span><div>Days</div></div>
-      <div class="time-box"><span id="h">0</span><div>Hours</div></div>
-      <div class="time-box"><span id="m">0</span><div>Minutes</div></div>
-      <div class="time-box"><span id="s">0</span><div>Seconds</div></div>
+      <!-- PRINCIPLES -->
+      <div class="card">
+        <h2>Launch Principles</h2>
+        <ul>
+          <li>Fair launch</li>
+          <li>No presale or private allocations</li>
+          <li>Liquidity added at launch</li>
+          <li>Ownership to be renounced</li>
+          <li>Transparent buy visibility</li>
+        </ul>
+      </div>
+
+      <!-- VENUE -->
+      <div class="card">
+        <h2>Launch Venue</h2>
+        <p>
+          This token will be minted and traded via <strong>Pump.fun</strong> on Solana.<br />
+          The official mint link will be revealed at launch.
+        </p>
+      </div>
+
+      <!-- COUNTDOWN -->
+      <div class="card">
+        <h2>Launch Countdown</h2>
+        <div class="countdown" id="countdown">
+          <div class="time"><span id="d">0</span>Days</div>
+          <div class="time"><span id="h">0</span>Hours</div>
+          <div class="time"><span id="m">0</span>Minutes</div>
+          <div class="time"><span id="s">0</span>Seconds</div>
+        </div>
+        <p style="text-align:center;margin-top:12px;color:var(--muted);">
+          Launch: Jan 1 · 12:00 PM CST
+        </p>
+      </div>
+
+      <!-- COMMUNITY -->
+      <div class="card">
+        <h2>Community</h2>
+        <div class="links">
+          <a href="#" target="_blank">Telegram</a>
+          <a href="#" target="_blank">X (Twitter)</a>
+        </div>
+      </div>
+
+      <div class="footer">
+        Informational only. No guarantees or promises of value.
+      </div>
+
     </div>
+  </section>
 
-    <div class="subtitle" style="margin-top:12px;">
-      Launch: Jan 1 · 12:00 PM CST
-    </div>
-  </div>
+  <script>
+    const launch = new Date("January 1, 2026 12:00:00 CST").getTime();
 
-  <!-- STATUS -->
-  <div class="panel status-grid">
-    <div class="status-item">Status: Pending on-chain deployment</div>
-    <div class="status-item">Network: Solana</div>
-    <div class="status-item">Token Name: Revealed at launch</div>
-    <div class="status-item">Ticker: TBA</div>
-    <div class="status-item">Contract: Revealed post-deployment</div>
-  </div>
+    setInterval(() => {
+      const now = new Date().getTime();
+      const diff = launch - now;
 
-  <!-- NARRATIVE -->
-  <div class="panel">
-    <h2>The First Coin</h2>
-    <p>
-      This deployment marks the genesis of a larger experiment — a Kingdom Mint Factory
-      designed to release one coin per day for 365 days.
-    </p>
-    <p>
-      The first coin sets the standard: fair access, visible on-chain activity,
-      anti-bot discipline, and organic, verifiable growth. What follows is a
-      compounding system, not a one-off launch.
-    </p>
-  </div>
+      if (diff < 0) return;
 
-  <!-- PRINCIPLES -->
-  <div class="panel">
-    <h2>Launch Principles</h2>
-    <p>
-      • Fair launch<br>
-      • No presale or private allocations<br>
-      • Liquidity added at launch<br>
-      • Ownership to be renounced<br>
-      • Transparent buy visibility
-    </p>
-  </div>
-
-  <!-- VENUE -->
-  <div class="panel">
-    <h2>Launch Venue</h2>
-    <p>
-      This token will be minted and traded via <strong>Pump.fun</strong> on Solana.<br>
-      The official mint link will be published at launch time.
-    </p>
-  </div>
-
-  <!-- COMMUNITY -->
-  <div class="panel links">
-    <h2>Community</h2>
-    <a href="https://t.me/solnerdkingdom" target="_blank">Telegram</a>
-    <a href="#" title="Revealed at launch">X (Twitter)</a>
-  </div>
-
-  <footer>
-    Informational only. No guarantees or promises of value.
-  </footer>
-
-</div>
-
-<script>
-const launch = new Date("2026-01-01T18:00:00Z").getTime();
-setInterval(() => {
-  const now = new Date().getTime();
-  const t = launch - now;
-  if (t < 0) return;
-
-  document.getElementById("d").textContent = Math.floor(t / 86400000);
-  document.getElementById("h").textContent = Math.floor(t / 3600000) % 24;
-  document.getElementById("m").textContent = Math.floor(t / 60000) % 60;
-  document.getElementById("s").textContent = Math.floor(t / 1000) % 60;
-}, 1000);
-</script>
-
+      document.getElementById("d").innerText = Math.floor(diff / (1000*60*60*24));
+      document.getElementById("h").innerText = Math.floor((diff / (1000*60*60)) % 24);
+      document.getElementById("m").innerText = Math.floor((diff / (1000*60)) % 60);
+      document.getElementById("s").innerText = Math.floor((diff / 1000) % 60);
+    }, 1000);
+  </script>
 </body>
 </html>
