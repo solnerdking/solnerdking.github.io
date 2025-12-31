@@ -13,7 +13,7 @@
   --bg-dark:#07061a;
   --bg-purple:#140b3a;
   --neon-purple:#a855f7;
-  --neon-cyan:#22f3ff;
+  --neon-red:#ff2b2b;
   --soft-white:#e6e8ff;
   --gold:#f5c77a;
 }
@@ -82,37 +82,40 @@ body{
   width:100%;
 }
 
-/* COUNTDOWN */
+/* COUNTDOWN (UPDATED) */
 .countdown{
   position:absolute;
-  bottom:22%;
+  bottom:27%; /* moved higher */
   left:50%;
   transform:translateX(-50%);
   display:flex;
-  gap:14px;
-  background:rgba(8,5,30,.85);
-  padding:16px 20px;
-  border-radius:12px;
-  border:1px solid rgba(168,85,247,.35);
+  gap:18px;
+  background:rgba(8,5,30,.9);
+  padding:22px 28px;
+  border-radius:14px;
+  border:1px solid rgba(255,43,43,.45);
 }
 
 .cd-box{
-  width:88px;
+  width:104px; /* bigger, fixed */
   text-align:center;
 }
 
 .cd-value{
   font-family:'Orbitron',monospace;
-  font-size:30px;
+  font-size:38px; /* bigger */
   font-weight:900;
-  color:var(--neon-cyan);
+  color:var(--neon-red);
+  text-shadow:
+    0 0 6px rgba(255,43,43,.9),
+    0 0 14px rgba(255,43,43,.7);
 }
 
 .cd-label{
   font-family:'Orbitron',monospace;
-  font-size:11px;
+  font-size:12px;
   letter-spacing:2px;
-  opacity:.8;
+  opacity:.85;
 }
 
 /* CONTAINERS */
@@ -228,7 +231,7 @@ footer{
   <h3>The First Coin</h3>
   <p>
     This moment marks the genesis of the <strong>Kingdom Mint Factory</strong> —
-    a disciplined project in transparent, on-chain releases.
+    a disciplined experiment in transparent, on-chain releases.
   </p>
 
   <p>
