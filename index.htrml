@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Stealth Token Deployment</title>
+  <meta name="description" content="Pre-deployment transparency page for a stealth-launched token." />
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #0b0b0b;
+      color: #eaeaea;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .container {
+      max-width: 700px;
+      padding: 40px;
+      border: 1px solid #222;
+      border-radius: 10px;
+      background: #111;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+    .tagline {
+      text-align: center;
+      color: #888;
+      margin-bottom: 30px;
+    }
+    .section {
+      margin-bottom: 25px;
+    }
+    .label {
+      color: #aaa;
+      font-size: 0.9em;
+      margin-bottom: 5px;
+    }
+    .value {
+      font-size: 1.05em;
+    }
+    .footer {
+      margin-top: 30px;
+      font-size: 0.8em;
+      color: #666;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>STEALTH MODE</h1>
+    <div class="tagline">Pre-deployment transparency page</div>
+
+    <div class="section">
+      <div class="label">Project Status</div>
+      <div class="value">Pending on-chain deployment</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Network</div>
+      <div class="value">Solana</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Token Name</div>
+      <div class="value">To be revealed at launch</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Ticker</div>
+      <div class="value">TBA</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Contract Address</div>
+      <div class="value">Revealed immediately after deployment</div>
+    </div>
+
+    <div class="section">
+      <div class="label">Launch Principles</div>
+      <div class="value">
+        • Fair launch<br/>
+        • No presale or private allocations<br/>
+        • Liquidity added at launch<br/>
+        • Ownership to be renounced
+      </div>
+    </div>
+
+    <div class="footer">
+      This page is informational only. No guarantees or promises are made.
+    </div>
+  </div>
+
+</body>
+</html>
