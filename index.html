@@ -1,279 +1,258 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>STEALTH MODE</title>
 
-<!-- VIRAL / GAME FONTS -->
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Orbitron:wght@500;700;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<!-- FONTS -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
 :root{
-  --bg-dark:#07061a;
-  --bg-purple:#140b3a;
-  --neon-purple:#a855f7;
-  --neon-green:#00ff7a;
-  --soft-white:#e6e8ff;
-  --gold:#f5c77a;
+  --bg:#050012;
+  --panel:#0b0620;
+  --border:#2b1a55;
+  --accent:#a855f7;
+  --neon:#00ff66;
+  --text:#e9e7ff;
 }
 
 *{box-sizing:border-box;margin:0;padding:0}
 
 body{
-  background:radial-gradient(circle at top, #1b1240, var(--bg-dark));
-  color:var(--soft-white);
+  background:radial-gradient(circle at top,#120033,#050012 60%);
+  color:var(--text);
   font-family:'Inter',sans-serif;
-  line-height:1.6;
+  text-align:center;
 }
 
-/* TOP CENTER SOCIALS */
-.top-socials{
+/* TOP LINKS */
+.top-links{
   display:flex;
   justify-content:center;
-  gap:28px;
-  padding:22px 0 10px;
+  align-items:center;
+  gap:30px;
+  padding:20px;
 }
 
-.top-socials a{
+.top-links a{
   display:flex;
   align-items:center;
-  gap:10px;
+  gap:8px;
+  color:#fff;
   text-decoration:none;
-  color:var(--soft-white);
-  font-weight:500;
+  font-weight:600;
 }
 
-.top-socials img{
-  height:26px;
+.top-links img{
+  height:28px;
+}
+
+.top-links .tg img{
+  height:34px; /* Telegram slightly bigger */
 }
 
 /* STEALTH HEADER */
 .stealth{
-  text-align:center;
-  padding:40px 20px 25px;
+  margin-top:10px;
 }
 
 .stealth h1{
   font-family:'Bebas Neue',sans-serif;
-  font-size:56px;
-  letter-spacing:6px;
-  color:var(--neon-purple);
+  letter-spacing:4px;
+  font-size:48px;
 }
 
 .stealth p{
-  margin-top:8px;
-  font-size:17px;
-  opacity:.85;
+  opacity:.8;
+  margin-top:6px;
 }
 
 /* HERO */
 .hero{
   position:relative;
-  background:#0b0726;
-  padding:60px 20px 50px;
+  margin:40px auto 20px;
+  max-width:1100px;
 }
 
 .hero img{
-  display:block;
-  margin:0 auto;
-  max-width:1200px;
   width:100%;
+  height:auto;
+  border-radius:16px;
+  background:#18003a;
 }
 
-/* COUNTDOWN (UPDATED AGAIN) */
+/* COUNTDOWN */
 .countdown{
   position:absolute;
-  bottom:31%; /* moved slightly higher */
+  bottom:28%; /* slightly higher */
   left:50%;
   transform:translateX(-50%);
   display:flex;
-  gap:22px;
-  background:rgba(8,5,30,.9);
-  padding:26px 34px;
+  gap:16px;
+  background:rgba(8,5,30,.85);
+  padding:18px 22px;
   border-radius:14px;
-  border:1px solid rgba(0,255,122,.35);
+  border:1px solid rgba(168,85,247,.4);
 }
 
 .cd-box{
-  width:120px; /* bigger */
-  text-align:center;
+  width:90px;
 }
 
 .cd-value{
   font-family:'Orbitron',monospace;
-  font-size:44px; /* bigger */
+  font-size:40px;
   font-weight:900;
-  color:var(--neon-green); /* neon green, no glow */
+  color:var(--neon);
 }
 
 .cd-label{
-  font-family:'Orbitron',monospace;
   font-size:12px;
-  letter-spacing:2px;
+  letter-spacing:1px;
   opacity:.85;
 }
 
 /* CONTAINERS */
 .container{
-  max-width:1100px;
-  margin:50px auto;
-  padding:34px;
-  background:rgba(15,10,50,.78);
-  border-radius:18px;
-  border:1px solid rgba(168,85,247,.28);
+  max-width:900px;
+  margin:40px auto;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:30px;
 }
 
 .container h2{
   font-family:'Bebas Neue',sans-serif;
-  letter-spacing:4px;
-  font-size:34px;
-  margin-bottom:18px;
-  color:var(--gold);
+  font-size:36px;
+  margin-bottom:20px;
+  letter-spacing:3px;
 }
 
 /* STATUS GRID */
-.status-grid{
+.status{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  grid-template-columns:1fr 1fr;
   gap:16px;
+  text-align:left;
 }
 
-.status-item strong{
-  color:var(--neon-purple);
-  font-weight:600;
+.status div strong{
+  color:var(--accent);
 }
 
-/* NARRATIVE */
-.narrative h3{
-  margin-top:26px;
-  margin-bottom:12px;
-  color:var(--neon-purple);
+/* TEXT */
+p{
+  line-height:1.7;
+  opacity:.9;
 }
 
-.narrative p{
-  margin-bottom:14px;
-}
-
-ul{
-  margin-top:12px;
-  padding-left:18px;
-}
-
-ul li{
-  margin-bottom:8px;
-}
-
-/* FOOTER */
-footer{
-  text-align:center;
-  padding:40px 20px;
-  font-size:13px;
-  opacity:.6;
+/* MOBILE */
+@media(max-width:768px){
+  .countdown{
+    bottom:30%;
+    gap:10px;
+    padding:14px 16px;
+  }
+  .cd-box{width:64px}
+  .cd-value{font-size:28px}
+  .status{grid-template-columns:1fr}
+  .stealth h1{font-size:36px}
 }
 </style>
 </head>
 
 <body>
 
-<!-- SOCIALS -->
-<div class="top-socials">
+<!-- TOP LINKS -->
+<div class="top-links">
   <a href="https://x.com/SolNerdKing" target="_blank">
-    <img src="x-logo.svg"> x.com/SolNerdKing
+    <img src="x-logo.svg" alt="X"> https://x.com/SolNerdKing
   </a>
-  <a href="https://t.me/solnerdkingdom" target="_blank">
-    <img src="telegram-logo.svg"> t.me/solnerdkingdom
+  <a class="tg" href="http://t.me/solnerdkingdom" target="_blank">
+    <img src="telegram-logo.svg" alt="Telegram"> http://t.me/solnerdkingdom
   </a>
 </div>
 
 <!-- STEALTH -->
-<section class="stealth">
+<div class="stealth">
   <h1>STEALTH MODE</h1>
   <p>Pre-deployment transparency stage</p>
-</section>
+</div>
 
 <!-- HERO -->
-<section class="hero">
+<div class="hero">
+  <img src="stealth-hero.png" alt="Stealth Hero">
+
+  <!-- COUNTDOWN -->
   <div class="countdown">
     <div class="cd-box"><div class="cd-value" id="d">00</div><div class="cd-label">DAYS</div></div>
     <div class="cd-box"><div class="cd-value" id="h">00</div><div class="cd-label">HOURS</div></div>
-    <div class="cd-box"><div class="cd-value" id="m">00</div><div class="cd-label">MIN</div></div>
-    <div class="cd-box"><div class="cd-value" id="s">00</div><div class="cd-label">SEC</div></div>
+    <div class="cd-box"><div class="cd-value" id="m">00</div><div class="cd-label">MINUTES</div></div>
+    <div class="cd-box"><div class="cd-value" id="s">00</div><div class="cd-label">SECONDS</div></div>
   </div>
-
-  <img src="stealth-hero.png" alt="Kingdom Mint Factory">
-</section>
+</div>
 
 <!-- STATUS -->
-<section class="container">
+<div class="container">
   <h2>MemeCoin Status</h2>
-  <div class="status-grid">
-    <div class="status-item"><strong>Status:</strong> Pending on-chain deployment</div>
-    <div class="status-item"><strong>Network:</strong> Solana</div>
-    <div class="status-item"><strong>Token Name:</strong> Revealed at launch</div>
-    <div class="status-item"><strong>Ticker:</strong> To Be Announced</div>
-    <div class="status-item"><strong>Contract:</strong> Revealed post-deployment</div>
-    <div class="status-item"><strong>Token Link:</strong> To Be Announced</div>
-    <div class="status-item"><strong>Developer Wallet:</strong> To Be Disclosed</div>
-    <div class="status-item"><strong>Developer Profile:</strong> To Be Announced</div>
+  <div class="status">
+    <div><strong>Status:</strong> Pending on-chain deployment</div>
+    <div><strong>Network:</strong> Solana</div>
+    <div><strong>Token Name:</strong> Revealed at launch</div>
+    <div><strong>Ticker:</strong> To Be Announced</div>
+    <div><strong>Contract:</strong> Revealed post-deployment</div>
+    <div><strong>Token Link:</strong> To Be Announced</div>
+    <div><strong>Developer Wallet:</strong> To Be Disclosed</div>
+    <div><strong>Developer Profile:</strong> To Be Announced</div>
   </div>
-</section>
+</div>
 
 <!-- NARRATIVE -->
-<section class="container narrative">
-  <h2>Welcome, Kingdom.</h2>
-  <p>A new year begins — and with it, a new <strong>alpha</strong>.</p>
-
-  <h3>The First Coin</h3>
+<div class="container">
+  <h2>The Genesis</h2>
   <p>
-    This moment marks the genesis of the <strong>Kingdom Mint Factory</strong> —
-    a disciplined experiment in transparent, on-chain releases.
-  </p>
-
-  <p>
+    Welcome, Kingdom. A new year begins — and with it, a new alpha.
+    This is the genesis of the Kingdom Mint Factory: a disciplined, transparent cycle of releases.
     No hype without proof. No insiders. No shortcuts.
-    Every deployment compounds trust, visibility, and verification.
   </p>
-
-  <h3>Launch Transparency & Tokenomics</h3>
-  <ul>
-    <li>Fair launch — no presale or private allocations</li>
-    <li>Liquidity added at launch</li>
-    <li>Ownership renounced post-deployment</li>
-    <li>Anti-bot & fair-entry protections</li>
-    <li>On-chain buy alerts</li>
-    <li>Community-first distribution</li>
-  </ul>
-<p>
-  <p>
-    This is the start of a full cycle: <strong>Α → Ω</strong>, from the first signal to <strong>ΩΜΞGΔ</strong>.<br>
-    One release at a time. No skips. No shortcuts.
+  <p style="margin-top:14px">
+    Α → Ω. One release at a time. The Factory runs until the Kingdom decides the cycle is complete.
   </p>
+</div>
 
+<!-- TOKENOMICS -->
+<div class="container">
+  <h2>Launch Transparency & Tokenomics</h2>
   <p>
-    You’re not here by chance — you’re here at the <strong>genesis</strong>.<br>
-    When the countdown ends, the Factory activates.<br>
-    <strong>The Kingdom decides what becomes alpha.</strong>
-  </p></p>
-</section>
-
-<footer>
-  Informational only. No guarantees or promises of value.
-</footer>
+    • Fair launch — no presale or private allocations<br>
+    • Liquidity added at launch<br>
+    • Ownership renounced post-deployment<br>
+    • Anti-bot & fair-entry protections<br>
+    • On-chain buy alerts<br>
+    • Community-first distribution
+  </p>
+</div>
 
 <script>
-const target = new Date("January 1, 2026 12:00:00 CST").getTime();
+const launchDate = new Date("January 1, 2026 12:00:00 CST").getTime();
+
 setInterval(()=>{
   const now = new Date().getTime();
-  const diff = target - now;
-  const d = Math.max(0,Math.floor(diff/(1000*60*60*24)));
-  const h = Math.max(0,Math.floor((diff%(1000*60*60*24))/(1000*60*60)));
-  const m = Math.max(0,Math.floor((diff%(1000*60*60))/(1000*60)));
-  const s = Math.max(0,Math.floor((diff%(1000*60))/1000));
-  document.getElementById("d").textContent = String(d).padStart(2,"0");
-  document.getElementById("h").textContent = String(h).padStart(2,"0");
-  document.getElementById("m").textContent = String(m).padStart(2,"0");
-  document.getElementById("s").textContent = String(s).padStart(2,"0");
+  let t = launchDate - now;
+  if(t<0) t=0;
+
+  const d = String(Math.floor(t/(1000*60*60*24))).padStart(2,'0');
+  const h = String(Math.floor((t/(1000*60*60))%24)).padStart(2,'0');
+  const m = String(Math.floor((t/(1000*60))%60)).padStart(2,'0');
+  const s = String(Math.floor((t/1000)%60)).padStart(2,'0');
+
+  document.getElementById("d").textContent=d;
+  document.getElementById("h").textContent=h;
+  document.getElementById("m").textContent=m;
+  document.getElementById("s").textContent=s;
 },1000);
 </script>
 
