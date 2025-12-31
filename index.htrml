@@ -2,102 +2,235 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <title>NYNERD — Kingdom Mint Factory</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Stealth Token Deployment</title>
-  <meta name="description" content="Pre-deployment transparency page for a stealth-launched token." />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
   <style>
+    :root {
+      --purple: #6b3cff;
+      --neon: #8affff;
+      --gold: #ffcf4a;
+      --dark: #0b0b12;
+      --card: #141427;
+    }
+
+    * { box-sizing: border-box; }
+
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0b0b0b;
-      color: #eaeaea;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
+      background: radial-gradient(circle at top, #1a1a3d, #05050a);
+      color: #ffffff;
+      font-family: Inter, sans-serif;
     }
-    .container {
-      max-width: 700px;
-      padding: 40px;
-      border: 1px solid #222;
-      border-radius: 10px;
-      background: #111;
+
+    header {
+      background: url('banner.jpg') center/cover no-repeat;
+      padding: 120px 20px;
+      text-align: center;
+      position: relative;
     }
+
+    header::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(5,5,10,0.75);
+    }
+
+    header > * {
+      position: relative;
+      z-index: 2;
+    }
+
+    .avatar {
+      width: 140px;
+      border-radius: 50%;
+      border: 4px solid var(--gold);
+      margin-bottom: 20px;
+    }
+
     h1 {
-      text-align: center;
-      margin-bottom: 10px;
-      letter-spacing: 1px;
+      font-family: Orbitron, sans-serif;
+      font-size: 3rem;
+      margin: 10px 0;
+      color: var(--gold);
+      letter-spacing: 2px;
     }
+
     .tagline {
-      text-align: center;
-      color: #888;
+      color: var(--neon);
+      font-size: 1.1rem;
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    section {
+      padding: 80px 20px;
+      max-width: 1100px;
+      margin: auto;
+    }
+
+    .card {
+      background: linear-gradient(145deg, #18183a, #0f0f25);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 30px;
       margin-bottom: 30px;
+      box-shadow: 0 0 40px rgba(107,60,255,0.15);
     }
-    .section {
-      margin-bottom: 25px;
+
+    h2 {
+      font-family: Orbitron, sans-serif;
+      color: var(--gold);
+      margin-bottom: 15px;
     }
-    .label {
-      color: #aaa;
-      font-size: 0.9em;
-      margin-bottom: 5px;
+
+    p {
+      color: #d6d6ff;
+      line-height: 1.7;
     }
-    .value {
-      font-size: 1.05em;
-    }
-    .footer {
+
+    .countdown {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
       margin-top: 30px;
-      font-size: 0.8em;
-      color: #666;
+      flex-wrap: wrap;
+    }
+
+    .time-box {
+      background: var(--card);
+      padding: 20px;
+      border-radius: 12px;
+      min-width: 100px;
       text-align: center;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .time-box span {
+      font-size: 2rem;
+      font-family: Orbitron;
+      color: var(--neon);
+    }
+
+    .label {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+
+    .tokenomics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+    }
+
+    .tokenomics div {
+      background: var(--card);
+      padding: 20px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 20px;
+      font-size: 0.85rem;
+      color: #777;
+    }
+
+    a {
+      color: var(--neon);
+      text-decoration: none;
     }
   </style>
 </head>
+
 <body>
 
-  <div class="container">
-    <h1>STEALTH MODE</h1>
-    <div class="tagline">Pre-deployment transparency page</div>
+<header>
+  <img src="avatar.jpg" class="avatar" alt="NYNERD">
+  <h1>NYNERD</h1>
+  <div class="tagline">
+    The first drop from the Kingdom Mint Factory.<br>
+    One coin a day. 365 days. Solana supremacy.
+  </div>
+</header>
 
-    <div class="section">
-      <div class="label">Project Status</div>
-      <div class="value">Pending on-chain deployment</div>
-    </div>
+<section>
+  <div class="card">
+    <h2>The Genesis</h2>
+    <p>
+      It’s 2026 — a new era in Solana’s meme kingdom. From the shadows emerges the Sol Nerd King,
+      unveiling the <strong>Kingdom Mint Factory</strong>: a daily engine of culture, community,
+      and engineered virality.
+    </p>
+    <p>
+      The journey begins with <strong>NYNERD</strong> — the New Year Nerd that flips resolutions
+      into revolutions. This is not a single launch. This is the foundation of an empire.
+    </p>
+  </div>
 
-    <div class="section">
-      <div class="label">Network</div>
-      <div class="value">Solana</div>
-    </div>
-
-    <div class="section">
-      <div class="label">Token Name</div>
-      <div class="value">To be revealed at launch</div>
-    </div>
-
-    <div class="section">
-      <div class="label">Ticker</div>
-      <div class="value">TBA</div>
-    </div>
-
-    <div class="section">
-      <div class="label">Contract Address</div>
-      <div class="value">Revealed immediately after deployment</div>
-    </div>
-
-    <div class="section">
-      <div class="label">Launch Principles</div>
-      <div class="value">
-        • Fair launch<br/>
-        • No presale or private allocations<br/>
-        • Liquidity added at launch<br/>
-        • Ownership to be renounced
-      </div>
-    </div>
-
-    <div class="footer">
-      This page is informational only. No guarantees or promises are made.
+  <div class="card">
+    <h2>Launch Countdown</h2>
+    <div class="countdown" id="countdown">
+      <div class="time-box"><span id="days">0</span><div class="label">Days</div></div>
+      <div class="time-box"><span id="hours">0</span><div class="label">Hours</div></div>
+      <div class="time-box"><span id="minutes">0</span><div class="label">Minutes</div></div>
+      <div class="time-box"><span id="seconds">0</span><div class="label">Seconds</div></div>
     </div>
   </div>
+
+  <div class="card">
+    <h2>Tokenomics (Transparent by Design)</h2>
+    <div class="tokenomics">
+      <div>🚀 Fair Launch — No presale, no insiders</div>
+      <div>💧 Liquidity added at launch</div>
+      <div>🔒 Anti-bot & fair entry protections</div>
+      <div>📈 On-chain buy alerts for transparency</div>
+      <div>🌱 Staged liquidity for organic growth</div>
+      <div>👑 Community-first distribution</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Join the Kingdom</h2>
+    <p>
+      The next 24 hours are about building trust, momentum, and a real community.
+      Early supporters don’t guess — they see the buys on-chain and grow together.
+    </p>
+    <p>
+      👉 <a href="https://t.me/solnerdkingdom" target="_blank">Join the Sol Nerd Kingdom on Telegram</a>
+    </p>
+  </div>
+</section>
+
+<footer>
+  NYNERD is a meme token for entertainment purposes only. No guarantees or promises of value.
+</footer>
+
+<script>
+  // SET YOUR LAUNCH DATE HERE (UTC)
+  const launchDate = new Date("2026-01-01T00:00:00Z").getTime();
+
+  const timer = setInterval(() => {
+    const now = new Date().getTime();
+    const distance = launchDate - now;
+
+    if (distance < 0) {
+      clearInterval(timer);
+      document.getElementById("countdown").innerHTML = "🚀 LAUNCHED";
+      return;
+    }
+
+    document.getElementById("days").textContent = Math.floor(distance / (1000 * 60 * 60 * 24));
+    document.getElementById("hours").textContent = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    document.getElementById("minutes").textContent = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+    document.getElementById("seconds").textContent = Math.floor((distance % (1000 * 60)) / 1000);
+  }, 1000);
+</script>
 
 </body>
 </html>
