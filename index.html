@@ -13,7 +13,7 @@
   --bg-dark:#07061a;
   --bg-purple:#140b3a;
   --neon-purple:#a855f7;
-  --neon-red:#ff2b2b;
+  --neon-green:#00ff7a;
   --soft-white:#e6e8ff;
   --gold:#f5c77a;
 }
@@ -59,7 +59,6 @@ body{
   font-size:56px;
   letter-spacing:6px;
   color:var(--neon-purple);
-  text-shadow:0 0 18px rgba(168,85,247,.85);
 }
 
 .stealth p{
@@ -82,33 +81,30 @@ body{
   width:100%;
 }
 
-/* COUNTDOWN (UPDATED) */
+/* COUNTDOWN (UPDATED AGAIN) */
 .countdown{
   position:absolute;
-  bottom:27%; /* moved higher */
+  bottom:31%; /* moved slightly higher */
   left:50%;
   transform:translateX(-50%);
   display:flex;
-  gap:18px;
+  gap:22px;
   background:rgba(8,5,30,.9);
-  padding:22px 28px;
+  padding:26px 34px;
   border-radius:14px;
-  border:1px solid rgba(255,43,43,.45);
+  border:1px solid rgba(0,255,122,.35);
 }
 
 .cd-box{
-  width:104px; /* bigger, fixed */
+  width:120px; /* bigger */
   text-align:center;
 }
 
 .cd-value{
   font-family:'Orbitron',monospace;
-  font-size:38px; /* bigger */
+  font-size:44px; /* bigger */
   font-weight:900;
-  color:var(--neon-red);
-  text-shadow:
-    0 0 6px rgba(255,43,43,.9),
-    0 0 14px rgba(255,43,43,.7);
+  color:var(--neon-green); /* neon green, no glow */
 }
 
 .cd-label{
