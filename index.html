@@ -18,31 +18,38 @@
   --text:#e9e7ff;
 }
 
-*{box-sizing:border-box;margin:0;padding:0}
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
 
 body{
   background:radial-gradient(circle at top,#120033,#050012 60%);
   color:var(--text);
   font-family:'Inter',sans-serif;
   text-align:center;
+  overflow-x:hidden;
 }
 
-/* TOP LINKS */
+/* ===== TOP LINKS ===== */
 .top-links{
   display:flex;
   justify-content:center;
   align-items:center;
-  gap:30px;
-  padding:20px;
+  gap:28px;
+  padding:20px 16px;
+  max-width:100%;
 }
 
 .top-links a{
   display:flex;
   align-items:center;
-  gap:8px;
+  gap:10px;
   color:#fff;
   text-decoration:none;
   font-weight:600;
+  white-space:nowrap;
 }
 
 .top-links img{
@@ -50,12 +57,13 @@ body{
 }
 
 .top-links .tg img{
-  height:34px; /* Telegram slightly bigger */
+  height:34px;
 }
 
-/* STEALTH HEADER */
+/* ===== STEALTH HEADER ===== */
 .stealth{
   margin-top:10px;
+  padding:0 16px;
 }
 
 .stealth h1{
@@ -69,11 +77,12 @@ body{
   margin-top:6px;
 }
 
-/* HERO */
+/* ===== HERO ===== */
 .hero{
   position:relative;
-  margin:40px auto 20px;
+  margin:36px auto 20px;
   max-width:1100px;
+  padding:0 16px;
 }
 
 .hero img{
@@ -81,12 +90,14 @@ body{
   height:auto;
   border-radius:16px;
   background:#18003a;
+  display:block;
+  margin:0 auto;
 }
 
-/* COUNTDOWN */
+/* ===== COUNTDOWN ===== */
 .countdown{
   position:absolute;
-  bottom:28%; /* slightly higher */
+  bottom:30%;
   left:50%;
   transform:translateX(-50%);
   display:flex;
@@ -114,16 +125,17 @@ body{
   opacity:.85;
 }
 
-/* CONTAINERS */
+/* ===== CONTAINERS ===== */
 .container{
   max-width:900px;
   margin:40px auto;
   background:var(--panel);
   border:1px solid var(--border);
   border-radius:16px;
-  padding:30px;
+  padding:30px 20px;
 }
 
+/* Titles */
 .container h2{
   font-family:'Bebas Neue',sans-serif;
   font-size:36px;
@@ -131,7 +143,7 @@ body{
   letter-spacing:3px;
 }
 
-/* STATUS GRID */
+/* Status grid */
 .status{
   display:grid;
   grid-template-columns:1fr 1fr;
@@ -139,27 +151,67 @@ body{
   text-align:left;
 }
 
+.status div{
+  line-height:1.6;
+}
+
 .status div strong{
   color:var(--accent);
 }
 
-/* TEXT */
+/* Text */
 p{
   line-height:1.7;
   opacity:.9;
 }
 
-/* MOBILE */
+/* ===== MOBILE FIXES ===== */
 @media(max-width:768px){
+
+  /* Top links stack & center */
+  .top-links{
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .top-links a{
+    white-space:normal;
+    word-break:break-all;
+    justify-content:center;
+  }
+
+  /* Countdown scaling */
   .countdown{
-    bottom:30%;
+    bottom:32%;
     gap:10px;
     padding:14px 16px;
   }
-  .cd-box{width:64px}
-  .cd-value{font-size:28px}
-  .status{grid-template-columns:1fr}
-  .stealth h1{font-size:36px}
+
+  .cd-box{
+    width:64px;
+  }
+
+  .cd-value{
+    font-size:28px;
+  }
+
+  .cd-label{
+    font-size:10px;
+  }
+
+  /* Status becomes single column */
+  .status{
+    grid-template-columns:1fr;
+  }
+
+  /* Title size */
+  .stealth h1{
+    font-size:36px;
+  }
+
+  .container h2{
+    font-size:30px;
+  }
 }
 </style>
 </head>
@@ -169,10 +221,12 @@ p{
 <!-- TOP LINKS -->
 <div class="top-links">
   <a href="https://x.com/SolNerdKing" target="_blank">
-    <img src="x-logo.svg" alt="X"> https://x.com/SolNerdKing
+    <img src="x-logo.svg" alt="X">
+    https://x.com/SolNerdKing
   </a>
   <a class="tg" href="http://t.me/solnerdkingdom" target="_blank">
-    <img src="telegram-logo.svg" alt="Telegram"> http://t.me/solnerdkingdom
+    <img src="telegram-logo.svg" alt="Telegram">
+    http://t.me/solnerdkingdom
   </a>
 </div>
 
