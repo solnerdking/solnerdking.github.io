@@ -2,116 +2,76 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Kingdom Mint Factory</title>
+<title>STEALTH MODE — Kingdom Mint Factory</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&display=swap" rel="stylesheet">
+<!-- Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Cinzel+Decorative:wght@700&family=Orbitron:wght@400;600;800&family=Rajdhani:wght@400;500;600&display=swap" rel="stylesheet">
 
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 
 body{
-  font-family:'Orbitron',sans-serif;
-  background:#050008;
+  font-family:'Rajdhani',sans-serif;
+  background:radial-gradient(circle at top,#1a0030 0%,#050008 70%);
   color:#fff;
 }
 
-/* ===== BACKGROUND ===== */
-.page-bg{
-  background:
-    radial-gradient(circle at center,#240044 0%,#050008 70%);
-  min-height:100vh;
-  padding:60px 16px;
-}
-
-/* ===== TOP LINKS ===== */
+/* ===== TOP LINKS (NOT STICKY) ===== */
 .top-links{
-  position:fixed;
+  position:absolute;
   top:20px;
   right:20px;
   display:flex;
   gap:18px;
-  z-index:99;
 }
 .top-links a{
   display:flex;
   align-items:center;
   gap:8px;
   font-size:12px;
-  color:#bfa8ff;
+  color:#cbb9ff;
   text-decoration:none;
 }
-.top-links img{
-  height:20px;
-}
+.top-links img{height:20px}
 
-/* ===== HERO IMAGE ===== */
-.hero{
-  max-width:1000px;
+/* ===== SECTIONS ===== */
+.section{
+  max-width:1100px;
   margin:0 auto 80px;
-  text-align:center;
-}
-.hero img{
-  width:100%;
-  max-width:900px;
+  padding:0 20px;
 }
 
-/* ===== STEALTH MODE ===== */
-.stealth{
+/* ===== STEALTH HEADER ===== */
+.stealth-header{
   text-align:center;
-  margin-bottom:90px;
+  margin-top:80px;
 }
-.stealth h2{
-  font-size:32px;
-  letter-spacing:3px;
-  color:#d4c1ff;
-  margin-bottom:14px;
+.stealth-header h1{
+  font-family:'Cinzel Decorative',serif;
+  font-size:42px;
+  letter-spacing:4px;
+  color:#e0d3ff;
+  text-shadow:0 0 18px rgba(160,100,255,.6);
 }
-.stealth p{
-  color:#9f8ee6;
+.stealth-header p{
+  margin-top:12px;
+  color:#b8a6ff;
   font-size:14px;
-  margin-bottom:28px;
-}
-
-/* ===== LED COUNTDOWN ===== */
-.countdown-shell{
-  max-width:900px;
-  margin:0 auto;
-  padding:26px 30px;
-  background:linear-gradient(180deg,#070707,#000);
-  border-radius:12px;
-  border:3px solid #1f1f1f;
-  box-shadow:inset 0 0 25px rgba(255,0,0,.25),0 0 40px #000;
-}
-.countdown-grid{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:22px;
-  text-align:center;
-}
-.cd-label{
-  font-size:13px;
-  letter-spacing:2px;
-  margin-bottom:6px;
-}
-.cd-value{
-  font-size:58px;
-  color:#ff1e1e;
-  text-shadow:0 0 8px rgba(255,30,30,.9),0 0 16px rgba(255,30,30,.6);
 }
 
 /* ===== STATUS ===== */
 .status{
-  max-width:1000px;
-  margin:100px auto 70px;
   background:linear-gradient(180deg,#0b0620,#060012);
   border-radius:18px;
-  padding:30px;
-  box-shadow:0 0 30px rgba(90,40,200,.25);
+  padding:32px;
+  box-shadow:0 0 35px rgba(90,40,200,.25);
 }
-.status h3{
+.status h2{
+  font-family:'Cinzel',serif;
+  font-size:22px;
   color:#ffd86b;
-  margin-bottom:18px;
+  margin-bottom:22px;
 }
 .status-grid{
   display:grid;
@@ -122,29 +82,77 @@ body{
   background:#0e0828;
   padding:16px;
   border-radius:12px;
-  font-size:13px;
-  color:#cfc3ff;
+  font-size:14px;
+  color:#d8ccff;
+}
+.status-item strong{
+  display:block;
+  color:#fff;
+  font-weight:600;
+  margin-bottom:4px;
+}
+
+/* ===== HERO IMAGE + COUNTDOWN ===== */
+.hero-wrap{
+  position:relative;
+  max-width:1000px;
+  margin:0 auto 90px;
+}
+.hero-wrap img{
+  width:100%;
+  display:block;
+  border-radius:16px;
+  box-shadow:0 0 60px rgba(160,80,255,.35);
+}
+
+/* ===== LED COUNTDOWN ===== */
+.countdown-shell{
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  background:linear-gradient(180deg,#070707,#000);
+  border-radius:12px;
+  border:3px solid #1f1f1f;
+  padding:22px 26px;
+  box-shadow:inset 0 0 25px rgba(255,0,0,.25),0 0 40px #000;
+}
+.countdown-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:22px;
+  text-align:center;
+}
+.cd-label{
+  font-family:'Orbitron',monospace;
+  font-size:12px;
+  letter-spacing:2px;
+}
+.cd-value{
+  font-family:'Orbitron',monospace;
+  font-size:54px;
+  color:#ff1e1e;
+  text-shadow:0 0 8px rgba(255,30,30,.9),0 0 16px rgba(255,30,30,.6);
 }
 
 /* ===== CONTENT ===== */
-.section{
-  max-width:1000px;
-  margin:0 auto 60px;
+.content{
   background:#0b0620;
-  padding:28px;
+  padding:34px;
   border-radius:18px;
 }
-.section h3{
+.content h2{
+  font-family:'Cinzel',serif;
   color:#ffd86b;
-  margin-bottom:12px;
+  margin-bottom:16px;
 }
-.section p{
-  color:#b9aaff;
-  font-size:14px;
-  line-height:1.7;
+.content p{
+  color:#cfc3ff;
+  font-size:15px;
+  line-height:1.75;
+  margin-bottom:14px;
 }
 
-/* MOBILE */
 @media(max-width:768px){
   .cd-value{font-size:36px}
 }
@@ -152,7 +160,6 @@ body{
 </head>
 
 <body>
-<div class="page-bg">
 
 <!-- TOP LINKS -->
 <div class="top-links">
@@ -164,15 +171,32 @@ body{
   </a>
 </div>
 
-<!-- HERO -->
-<div class="hero">
-  <img src="stealth-hero.png" alt="Kingdom Mint Factory">
+<!-- 1. STEALTH MODE -->
+<div class="section stealth-header">
+  <h1>STEALTH MODE</h1>
+  <p>Pre-deployment transparency stage</p>
 </div>
 
-<!-- STEALTH MODE -->
-<div class="stealth">
-  <h2>STEALTH MODE</h2>
-  <p>Pre-deployment transparency stage</p>
+<!-- 2. STATUS -->
+<div class="section">
+  <div class="status">
+    <h2>MemeCoin Status</h2>
+    <div class="status-grid">
+      <div class="status-item"><strong>Status</strong>Pending on-chain deployment</div>
+      <div class="status-item"><strong>Network</strong>Solana</div>
+      <div class="status-item"><strong>Token Name</strong>Revealed at launch</div>
+      <div class="status-item"><strong>Ticker</strong>To Be Announced</div>
+      <div class="status-item"><strong>Contract</strong>Revealed post-deployment</div>
+      <div class="status-item"><strong>Token Link</strong>To Be Announced</div>
+      <div class="status-item"><strong>Developer Wallet</strong>To Be Disclosed</div>
+      <div class="status-item"><strong>Launch Venue</strong>Pump.fun (link revealed at launch)</div>
+    </div>
+  </div>
+</div>
+
+<!-- 3 & 4. HERO + COUNTDOWN -->
+<div class="hero-wrap">
+  <img src="stealth-hero.png" alt="Kingdom Mint Factory">
 
   <div class="countdown-shell">
     <div class="countdown-grid">
@@ -184,45 +208,36 @@ body{
   </div>
 </div>
 
-<!-- STATUS -->
-<div class="status">
-<h3>Status</h3>
-<div class="status-grid">
-  <div class="status-item">Status<br>Pending on-chain deployment</div>
-  <div class="status-item">Network<br>Solana</div>
-  <div class="status-item">Token Name<br>Revealed at launch</div>
-  <div class="status-item">Ticker<br>To Be Announced</div>
-  <div class="status-item">Contract<br>Revealed post-deployment</div>
-  <div class="status-item">Token Link<br>To Be Announced</div>
-  <div class="status-item">Developer Wallet<br>To Be Disclosed</div>
-  <div class="status-item">Developer Profile<br>To Be Announced</div>
-</div>
-</div>
-
-<!-- CONTENT -->
+<!-- 5 & 7. NARRATIVE + TOKENOMICS -->
 <div class="section">
-<h3>The First Coin</h3>
-<p>
-This deployment marks the genesis of a longer experiment — a Kingdom Mint Factory
-designed to release one coin per day for 365 days.
-</p>
-</div>
+  <div class="content">
+    <h2>The First Coin — Kingdom Genesis</h2>
+    <p><strong>Launch Narrative for NYNERD:</strong></p>
+    <p>
+      Picture this: It’s 2026, the dawn of a new era in the meme kingdom. You’ve been grinding in the shadows,
+      but now the Sol Nerd King unleashes the Kingdom Mint Factory.
+    </p>
+    <p>
+      No more chasing moonshots. One coin per day. 365 days. Engineered for virality,
+      community power, and dominance. NYNERD — the New Year Nerd — flips resolutions into revolutions.
+    </p>
 
-<div class="section">
-<h3>Launch Venue</h3>
-<p>
-Minted and traded via Pump.fun.  
-Launch link revealed at deployment.
-</p>
-</div>
-
+    <h2>Launch Transparency & Tokenomics</h2>
+    <p>
+      • Fair launch — no presale, no private allocations<br>
+      • Liquidity added at launch<br>
+      • Ownership renounced post-deployment<br>
+      • Anti-bot & fair-entry protections<br>
+      • On-chain buy alerts for full transparency<br>
+      • Community-first distribution
+    </p>
+  </div>
 </div>
 
 <script>
-const launch = new Date("January 1, 2026 12:00:00 CST").getTime();
+const launch=new Date("January 1, 2026 12:00:00 CST").getTime();
 setInterval(()=>{
-  const now=Date.now();
-  const diff=launch-now;
+  const now=Date.now(),diff=launch-now;
   if(diff<=0)return;
   d.textContent=Math.floor(diff/86400000);
   h.textContent=Math.floor(diff/3600000)%24;
