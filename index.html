@@ -1,642 +1,243 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SolNerdKing - Stealth Mode</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Signika:wght@400;500;600;700&family=Roboto:wght@400;500;700;900&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
-        }
-
-        html {
-            scroll-behavior: smooth;
-        }
-
-        body {
-            font-family: 'Roboto', sans-serif;
-            background: linear-gradient(135deg, #0f0620 0%, #1a0f3d 25%, #2d1b5e 50%, #1a0f3d 75%, #0f0620 100%);
-            background-attachment: fixed;
-            color: #e8e0ff;
-            min-height: 100vh;
-            overflow-x: hidden;
-            position: relative;
-        }
-
-        .hero-background {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800"><defs><radialGradient id="heroGlow" cx="50%" cy="50%"><stop offset="0%" style="stop-color:%23a855f7;stop-opacity:0.15"/><stop offset="100%" style="stop-color:%231a0f3d;stop-opacity:0.8"/></radialGradient></defs><rect width="1200" height="800" fill="url(%23heroGlow)"/></svg>');
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            z-index: 0;
-            opacity: 0.8;
-        }
-
-        .orb {
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(120px);
-            pointer-events: none;
-            z-index: 0;
-        }
-
-        .orb-1 {
-            width: 600px;
-            height: 600px;
-            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
-            top: -300px;
-            right: -300px;
-            opacity: 0.15;
-            animation: float 20s ease-in-out infinite;
-        }
-
-        .orb-2 {
-            width: 500px;
-            height: 500px;
-            background: linear-gradient(135deg, #06b6d4 0%, #0ea5e9 100%);
-            bottom: -250px;
-            left: -250px;
-            opacity: 0.12;
-            animation: float 25s ease-in-out infinite reverse;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translate(0, 0); }
-            50% { transform: translate(50px, 50px); }
-        }
-
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-            padding: 0 24px;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Navigation */
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 28px 0;
-            border-bottom: 1px solid rgba(168, 85, 247, 0.2);
-            position: sticky;
-            top: 0;
-            background: rgba(15, 6, 32, 0.7);
-            backdrop-filter: blur(20px);
-            z-index: 100;
-        }
-
-        .nav-brand {
-            font-family: 'Signika', sans-serif;
-            font-size: 28px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            background: linear-gradient(135deg, #a78bfa 0%, #e879f9 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .nav-links {
-            display: flex;
-            gap: 48px;
-            list-style: none;
-        }
-
-        .nav-links a {
-            font-size: 15px;
-            color: #b5a3ff;
-            text-decoration: none;
-            font-weight: 500;
-            transition: all 0.3s ease;
-            font-family: 'Roboto', sans-serif;
-        }
-
-        .nav-links a:hover {
-            color: #e879f9;
-        }
-
-        /* Hero Section */
-        .hero {
-            padding: 140px 0 100px;
-            text-align: center;
-        }
-
-        .hero-label {
-            font-size: 14px;
-            letter-spacing: 2px;
-            color: #a78bfa;
-            text-transform: uppercase;
-            margin-bottom: 16px;
-            font-weight: 600;
-            font-family: 'Roboto', sans-serif;
-        }
-
-        .hero-title {
-            font-family: 'Signika', sans-serif;
-            font-size: 92px;
-            font-weight: 700;
-            letter-spacing: -2px;
-            background: linear-gradient(135deg, #60a5fa 0%, #a78bfa 25%, #e879f9 50%, #f472b6 75%, #fbbf24 100%);
-            background-size: 300% 300%;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 24px;
-            line-height: 1.05;
-            animation: gradientShift 8s ease infinite;
-        }
-
-        @keyframes gradientShift {
-            0% { background-position: 0% 50%; }
-            50% { background-position: 100% 50%; }
-            100% { background-position: 0% 50%; }
-        }
-
-        .hero-subtitle {
-            font-family: 'Roboto', sans-serif;
-            font-size: 24px;
-            font-weight: 400;
-            color: #c4b8e0;
-            margin-bottom: 48px;
-            line-height: 1.5;
-            max-width: 900px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        /* Social Links */
-        .social-container {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-bottom: 100px;
-            flex-wrap: wrap;
-        }
-
-        .social-btn {
-            padding: 16px 40px;
-            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 16px;
-            font-weight: 600;
-            font-size: 16px;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            border: 2px solid transparent;
-            cursor: pointer;
-            font-family: 'Roboto', sans-serif;
-        }
-
-        .social-btn:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 20px 50px rgba(168, 85, 247, 0.3);
-        }
-
-        .social-btn-secondary {
-            background: transparent;
-            color: #a78bfa;
-            border: 2px solid #a78bfa;
-        }
-
-        .social-btn-secondary:hover {
-            background: rgba(168, 85, 247, 0.1);
-            border-color: #e879f9;
-            color: #e879f9;
-        }
-
-        /* Countdown - Digital Style */
-        .countdown-section {
-            margin: 120px 0;
-            padding: 80px 60px;
-            background: rgba(15, 6, 32, 0.5);
-            backdrop-filter: blur(25px);
-            border: 1px solid rgba(168, 85, 247, 0.3);
-            border-radius: 32px;
-            box-shadow: 0 25px 80px rgba(168, 85, 247, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-        }
-
-        .countdown-title {
-            font-family: 'Signika', sans-serif;
-            font-size: 48px;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 70px;
-            color: #f0e5ff;
-            letter-spacing: -1px;
-        }
-
-        .countdown-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 32px;
-            margin-bottom: 50px;
-        }
-
-        .countdown-item {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(168, 85, 247, 0.25);
-            border-radius: 24px;
-            padding: 40px 28px;
-            text-align: center;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            backdrop-filter: blur(10px);
-        }
-
-        .countdown-item:hover {
-            background: rgba(168, 85, 247, 0.15);
-            border-color: rgba(168, 85, 247, 0.5);
-            transform: translateY(-8px);
-        }
-
-        .countdown-number {
-            font-family: 'Orbitron', monospace;
-            font-size: 80px;
-            font-weight: 900;
-            letter-spacing: 3px;
-            color: #ff3333;
-            margin-bottom: 14px;
-            display: block;
-            min-height: 95px;
-            text-shadow: 0 0 20px rgba(255, 51, 51, 0.8), 0 0 40px rgba(255, 51, 51, 0.4);
-            animation: digitGlow 2s ease-in-out infinite;
-        }
-
-        @keyframes digitGlow {
-            0%, 100% { text-shadow: 0 0 20px rgba(255, 51, 51, 0.8), 0 0 40px rgba(255, 51, 51, 0.4); }
-            50% { text-shadow: 0 0 30px rgba(255, 51, 51, 1), 0 0 60px rgba(255, 51, 51, 0.6); }
-        }
-
-        .countdown-label {
-            font-size: 13px;
-            color: #ff6666;
-            font-weight: 700;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            font-family: 'Orbitron', monospace;
-            font-size: 11px;
-        }
-
-        .launch-time {
-            text-align: center;
-            font-family: 'Signika', sans-serif;
-            font-size: 26px;
-            font-weight: 600;
-            color: #e0d5ff;
-            letter-spacing: -0.5px;
-        }
-
-        /* Section */
-        .section {
-            padding: 120px 0;
-            border-top: 1px solid rgba(168, 85, 247, 0.15);
-        }
-
-        .section-title {
-            font-family: 'Signika', sans-serif;
-            font-size: 56px;
-            font-weight: 700;
-            letter-spacing: -1px;
-            margin-bottom: 70px;
-            color: #f0e5ff;
-        }
-
-        /* Status Grid */
-        .status-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-            gap: 28px;
-        }
-
-        .status-item {
-            background: rgba(139, 92, 246, 0.08);
-            border: 1px solid rgba(168, 85, 247, 0.25);
-            border-radius: 24px;
-            padding: 40px 32px;
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-            border-left: 4px solid #a78bfa;
-            backdrop-filter: blur(10px);
-        }
-
-        .status-item:hover {
-            background: rgba(168, 85, 247, 0.15);
-            border-color: rgba(168, 85, 247, 0.4);
-            border-left-color: #e879f9;
-            transform: translateY(-8px);
-            box-shadow: 0 20px 60px rgba(168, 85, 247, 0.15);
-        }
-
-        .status-label {
-            font-size: 12px;
-            color: #9b8fc4;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-            font-weight: 600;
-            margin-bottom: 14px;
-            font-family: 'Roboto', sans-serif;
-        }
-
-        .status-value {
-            font-family: 'Signika', sans-serif;
-            font-size: 24px;
-            font-weight: 700;
-            color: #fbbf24;
-            letter-spacing: -0.3px;
-        }
-
-        /* Feature Section */
-        .feature-section {
-            padding: 80px 60px;
-            background: rgba(168, 85, 247, 0.08);
-            border: 1px solid rgba(168, 85, 247, 0.25);
-            border-radius: 32px;
-            margin: 100px 0;
-            box-shadow: 0 25px 80px rgba(168, 85, 247, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(20px);
-        }
-
-        .feature-title {
-            font-family: 'Signika', sans-serif;
-            font-size: 48px;
-            font-weight: 700;
-            letter-spacing: -1px;
-            color: #f0e5ff;
-            margin-bottom: 28px;
-        }
-
-        .feature-text {
-            font-family: 'Roboto', sans-serif;
-            font-size: 18px;
-            line-height: 1.8;
-            color: #c4b8e0;
-            margin-bottom: 20px;
-        }
-
-        /* Venue Section */
-        .venue-section {
-            padding: 100px 0;
-            text-align: center;
-            border-top: 1px solid rgba(168, 85, 247, 0.15);
-        }
-
-        .venue-title {
-            font-family: 'Signika', sans-serif;
-            font-size: 48px;
-            font-weight: 700;
-            letter-spacing: -1px;
-            color: #f0e5ff;
-            margin-bottom: 28px;
-        }
-
-        .venue-text {
-            font-family: 'Roboto', sans-serif;
-            font-size: 18px;
-            color: #c4b8e0;
-            margin-bottom: 20px;
-            line-height: 1.8;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-
-        .pump-text {
-            color: #06b6d4;
-            font-weight: 700;
-        }
-
-        .disclaimer {
-            font-size: 15px;
-            color: #9b8fc4;
-            margin-top: 28px;
-            font-weight: 500;
-            font-family: 'Roboto', sans-serif;
-        }
-
-        /* Footer */
-        footer {
-            border-top: 1px solid rgba(168, 85, 247, 0.15);
-            padding: 60px 0;
-            font-size: 13px;
-            color: #7a6a99;
-            text-align: center;
-            margin-top: 100px;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .hero-title {
-                font-size: 56px;
-            }
-
-            .hero-subtitle {
-                font-size: 18px;
-            }
-
-            .section-title {
-                font-size: 36px;
-            }
-
-            .countdown-number {
-                font-size: 60px;
-                min-height: 70px;
-            }
-
-            .countdown-container {
-                grid-template-columns: repeat(2, 1fr);
-                gap: 20px;
-            }
-
-            .countdown-section {
-                padding: 50px 30px;
-            }
-
-            .feature-section {
-                padding: 50px 30px;
-            }
-
-            .nav-links {
-                gap: 24px;
-                font-size: 13px;
-            }
-        }
-
-        @media (max-width: 480px) {
-            .hero-title {
-                font-size: 42px;
-            }
-
-            .hero-subtitle {
-                font-size: 16px;
-            }
-
-            .section-title {
-                font-size: 28px;
-            }
-
-            .countdown-number {
-                font-size: 48px;
-                min-height: 55px;
-            }
-
-            nav {
-                padding: 16px 0;
-            }
-
-            .nav-links {
-                display: none;
-            }
-
-            .countdown-section {
-                padding: 40px 20px;
-            }
-
-            .feature-section {
-                padding: 40px 20px;
-            }
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>STEALTH MODE — Pre-Deployment</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+:root {
+  --bg-dark: #080616;
+  --bg-purple: #120a2a;
+  --neon-purple: #a855f7;
+  --neon-cyan: #22d3ee;
+  --neon-pink: #ec4899;
+  --card-bg: rgba(255,255,255,0.04);
+  --border-glow: rgba(168,85,247,0.4);
+  --text-muted: #b5b3d6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, sans-serif;
+  background: radial-gradient(circle at top, #1b0f3a, var(--bg-dark));
+  color: white;
+}
+
+/* ===== TOP BAR ===== */
+.topbar {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  gap: 18px;
+  z-index: 10;
+}
+
+.social {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--neon-cyan);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.social img {
+  height: 18px;
+}
+
+/* ===== HERO ===== */
+.hero {
+  text-align: center;
+  padding: 80px 20px 40px;
+}
+
+.hero-logo {
+  max-width: 420px;
+  width: 90%;
+  margin-bottom: 40px;
+}
+
+.hero-image {
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.hero-image img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 0 40px rgba(168,85,247,0.6));
+}
+
+/* ===== COUNTDOWN ===== */
+.countdown {
+  margin: 60px auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(70px, 120px));
+  gap: 20px;
+  justify-content: center;
+}
+
+.time-box {
+  background: linear-gradient(180deg, #0f0b2a, #09061b);
+  border: 1px solid var(--border-glow);
+  border-radius: 12px;
+  padding: 18px 10px;
+  box-shadow: 0 0 25px rgba(168,85,247,0.25);
+}
+
+.time {
+  font-family: Orbitron, sans-serif;
+  font-size: 36px;
+  color: var(--neon-cyan);
+}
+
+.label {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--text-muted);
+}
+
+/* ===== CONTENT ===== */
+.container {
+  max-width: 900px;
+  margin: auto;
+  padding: 20px;
+}
+
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-glow);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 0 35px rgba(0,0,0,0.6);
+}
+
+.card h2 {
+  font-family: Orbitron, sans-serif;
+  font-size: 18px;
+  color: var(--neon-purple);
+  margin-bottom: 16px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.stat {
+  background: rgba(255,255,255,0.03);
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.stat span {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.stat strong {
+  font-size: 14px;
+}
+
+/* ===== FOOTER ===== */
+footer {
+  text-align: center;
+  padding: 40px 20px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+</style>
 </head>
+
 <body>
-    <div class="hero-background"></div>
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
 
-    <div class="container">
-        <nav>
-            <div class="nav-brand">SOLNERDKING</div>
-            <ul class="nav-links">
-                <li><a href="#status">Status</a></li>
-                <li><a href="#kingdom">Kingdom</a></li>
-                <li><a href="#launch">Launch</a></li>
-            </ul>
-        </nav>
+<!-- TOP SOCIALS -->
+<div class="topbar">
+  <a class="social" href="https://x.com/SolNerdKing" target="_blank">
+    <img src="assets/x-logo.svg" alt="X"> x.com/SolNerdKing
+  </a>
+  <a class="social" href="https://t.me/solnerdkingdom" target="_blank">
+    <img src="assets/telegram-logo.svg" alt="Telegram"> t.me/solnerdkingdom
+  </a>
+</div>
 
-        <div class="hero">
-            <p class="hero-label">Stealth Mode</p>
-            <h1 class="hero-title">SOLNERDKING</h1>
-            <p class="hero-subtitle">One coin per day for 365 days. The genesis of a Kingdom Mint Factory.</p>
-            
-            <div class="social-container">
-                <a href="https://x.com/SolNerdKing" class="social-btn" target="_blank">Follow on Twitter</a>
-                <a href="https://t.me/solnerdkingdom" class="social-btn social-btn-secondary" target="_blank">Join Telegram</a>
-            </div>
-        </div>
+<!-- HERO -->
+<section class="hero">
+  <img src="assets/solnerdking-logo.png" class="hero-logo" alt="SOLNERDKING">
 
-        <div class="countdown-section">
-            <h2 class="countdown-title">Launching Soon</h2>
-            <div class="countdown-container">
-                <div class="countdown-item">
-                    <span class="countdown-number" id="days">00</span>
-                    <div class="countdown-label">Days</div>
-                </div>
-                <div class="countdown-item">
-                    <span class="countdown-number" id="hours">00</span>
-                    <div class="countdown-label">Hours</div>
-                </div>
-                <div class="countdown-item">
-                    <span class="countdown-number" id="minutes">00</span>
-                    <div class="countdown-label">Minutes</div>
-                </div>
-                <div class="countdown-item">
-                    <span class="countdown-number" id="seconds">00</span>
-                    <div class="countdown-label">Seconds</div>
-                </div>
-            </div>
-            <div class="launch-time">January 1, 2025 · 12:00 PM CST</div>
-        </div>
+  <div class="hero-image">
+    <img src="assets/stealth-hero.png" alt="Kingdom Mint Factory">
+  </div>
 
-        <div class="section" id="status">
-            <h2 class="section-title">Status</h2>
-            <div class="status-grid">
-                <div class="status-item">
-                    <div class="status-label">Status</div>
-                    <div class="status-value">Pending Deployment</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Network</div>
-                    <div class="status-value">Solana</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Token Name</div>
-                    <div class="status-value">Revealed at Launch</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Ticker</div>
-                    <div class="status-value">TBA</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Contract</div>
-                    <div class="status-value">Post-Deployment</div>
-                </div>
-                <div class="status-item">
-                    <div class="status-label">Developer Wallet</div>
-                    <div class="status-value">To Be Disclosed</div>
-                </div>
-            </div>
-        </div>
+  <!-- COUNTDOWN -->
+  <div class="countdown" id="countdown">
+    <div class="time-box"><div class="time" id="days">--</div><div class="label">DAYS</div></div>
+    <div class="time-box"><div class="time" id="hours">--</div><div class="label">HOURS</div></div>
+    <div class="time-box"><div class="time" id="minutes">--</div><div class="label">MINUTES</div></div>
+    <div class="time-box"><div class="time" id="seconds">--</div><div class="label">SECONDS</div></div>
+  </div>
+</section>
 
-        <div class="feature-section" id="kingdom">
-            <h2 class="feature-title">The Kingdom Mint Factory</h2>
-            <p class="feature-text">This deployment marks the genesis of a Kingdom Mint Factory — one coin per day for 365 days.</p>
-            <p class="feature-text">The first establishes the standard: fair access, visible on-chain activity, anti-bot discipline, and organic growth. What follows compounds into legendary legacy.</p>
-        </div>
+<!-- CONTENT -->
+<div class="container">
 
-        <div class="venue-section" id="launch">
-            <h2 class="venue-title">Launch Venue</h2>
-            <p class="venue-text">Minted and traded via <span class="pump-text">Pump.fun</span> on Solana. Official link revealed at launch.</p>
-            <p class="disclaimer">Informational only. No guarantees or promises of value.</p>
-        </div>
+  <div class="card">
+    <h2>Status</h2>
+    <div class="grid">
+      <div class="stat"><span>Status</span><strong>Pending on-chain deployment</strong></div>
+      <div class="stat"><span>Network</span><strong>Solana</strong></div>
+      <div class="stat"><span>Token Name</span><strong>Revealed at launch</strong></div>
+      <div class="stat"><span>Ticker</span><strong>To Be Announced</strong></div>
+      <div class="stat"><span>Contract</span><strong>Revealed post-deployment</strong></div>
+      <div class="stat"><span>Token Link</span><strong>To Be Announced</strong></div>
+      <div class="stat"><span>Developer Wallet</span><strong>To Be Disclosed</strong></div>
+      <div class="stat"><span>Developer Profile</span><strong>To Be Announced</strong></div>
     </div>
+  </div>
 
-    <footer>
-        <p>Copyright 2025 SolNerdKing. All rights reserved.</p>
-    </footer>
+  <div class="card">
+    <h2>The First Coin</h2>
+    <p>
+      This deployment marks the genesis of the Kingdom Mint Factory — a controlled,
+      transparent system designed to release one coin per day for 365 days.
+      Each launch compounds trust, visibility, and on-chain proof.
+    </p>
+  </div>
 
-    <script>
-        function updateCountdown() {
-            const targetDate = new Date('2025-01-01T12:00:00-06:00').getTime();
-            
-            const updateDisplay = () => {
-                const now = new Date().getTime();
-                const distance = targetDate - now;
+</div>
 
-                if (distance < 0) {
-                    document.getElementById('days').textContent = '00';
-                    document.getElementById('hours').textContent = '00';
-                    document.getElementById('minutes').textContent = '00';
-                    document.getElementById('seconds').textContent = '00';
-                    return;
-                }
+<footer>
+  Informational only. No guarantees or promises of value.
+</footer>
 
-                const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-                const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-                const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-                const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+<script>
+const launchDate = new Date("January 1, 2026 12:00:00 CST").getTime();
 
-                document.getElementById('days').textContent = String(days).padStart(2, '0');
-                document.getElementById('hours').textContent = String(hours).padStart(2, '0');
-                document.getElementById('minutes').textContent = String(minutes).padStart(2, '0');
-                document.getElementById('seconds').textContent = String(seconds).padStart(2, '0');
-            };
+setInterval(() => {
+  const now = new Date().getTime();
+  const diff = launchDate - now;
 
-            updateDisplay();
-            setInterval(updateDisplay, 1000);
-        }
+  if (diff <= 0) return;
 
-        updateCountdown();
-    </script>
+  document.getElementById("days").innerText = Math.floor(diff / (1000 * 60 * 60 * 24));
+  document.getElementById("hours").innerText = Math.floor((diff / (1000 * 60 * 60)) % 24);
+  document.getElementById("minutes").innerText = Math.floor((diff / (1000 * 60)) % 60);
+  document.getElementById("seconds").innerText = Math.floor((diff / 1000) % 60);
+}, 1000);
+</script>
+
 </body>
 </html>
