@@ -46,12 +46,22 @@
   padding:0;
 }
 
+html, body {
+  height: 100%;
+}
+
 body{
   background:radial-gradient(circle at top,#120033,#050012 60%);
   color:var(--text);
   font-family:'Inter',sans-serif;
   text-align:center;
   overflow-x:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+main {
+  flex: 1;
 }
 
 /* ===== TOP LINKS ===== */
@@ -187,6 +197,39 @@ p{
   opacity:.9;
 }
 
+
+
+/* ===== PAGE STATUS ===== */
+.page-status {
+  text-align:center;
+  color:var(--text);
+  opacity:.6;
+  font-size:12px;
+  padding:20px 16px 0;
+  margin-bottom:10px;
+}
+
+/* ===== FOOTER DISCLAIMER ===== */
+footer {
+  background:rgba(0,0,0,.4);
+  border-top:1px solid var(--border);
+  padding:30px 20px;
+  margin-top:auto;
+  text-align:center;
+}
+
+.disclaimer {
+  max-width:900px;
+  margin:0 auto;
+  line-height:1.7;
+  opacity:.7;
+  font-size:12px;
+}
+
+.disclaimer strong {
+  color:var(--accent);
+}
+
 /* ===== MOBILE FIXES ===== */
 @media(max-width:768px){
 
@@ -234,11 +277,17 @@ p{
   .container h2{
     font-size:30px;
   }
+
+  .tg-messages {
+    height:300px;
+  }
 }
 </style>
 </head>
 
 <body>
+
+<main>
 
 <!-- TOP LINKS -->
 <div class="top-links">
@@ -256,6 +305,11 @@ p{
 <div class="stealth">
   <h1>STEALTH LAUNCH</h1>
   <p>Pre-deployment transparency stage</p>
+</div>
+
+<!-- PAGE STATUS -->
+<div class="page-status">
+  This page was last updated on: January 1st 2026 @ 11:00AM CST
 </div>
 
 <!-- HERO -->
@@ -309,6 +363,21 @@ p{
   </p>
 </div>
 
+<!-- TELEGRAM WIDGET -->
+<div class="tg-widget-container">
+  <h2>Live Community</h2>
+  <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-post="solnerdkingdom/1" data-width="100%"></script>
+</div>
+
+</main>
+
+<!-- FOOTER DISCLAIMER -->
+<footer>
+  <div class="disclaimer">
+    <strong>⚠️ Disclaimer:</strong> This project and all memecoins are solely for entertainment purposes. This is not financial advice. Cryptocurrency investments carry significant risk, including the potential loss of principal. Do not invest more than you can afford to lose. Always conduct your own research (DYOR) and consult with a qualified financial advisor before making any investment decisions. The Kingdom Mint Factory and associated parties are not responsible for any financial losses incurred.
+  </div>
+</footer>
+
 <script>
 const launchDate = new Date("January 1, 2026 12:00:00 CST").getTime();
 
@@ -327,6 +396,8 @@ setInterval(()=>{
   document.getElementById("m").textContent=m;
   document.getElementById("s").textContent=s;
 },1000);
+
+
 </script>
 
 </body>
