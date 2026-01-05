@@ -100,3 +100,16 @@
 {"location":"App.js:568","message":"Layout container check","data":{"display":"flex","flexDirection":"row","gap":"16px","hasFlexClass":true},"timestamp":1767591735960,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
 {"location":"App.js:568","message":"Layout container check","data":{"display":"flex","flexDirection":"row","gap":"16px","hasFlexClass":true},"timestamp":1767591760439,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
 {"location":"App.js:568","message":"Layout container check","data":{"display":"flex","flexDirection":"row","gap":"16px","hasFlexClass":true},"timestamp":1767591761097,"sessionId":"debug-session","runId":"run1","hypothesisId":"D"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592171638,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592448904,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592452115,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592553994,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592761617,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592771096,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592772728,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767592840659,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767593373413,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767595596069,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767595616459,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767595631514,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}
+{"location":"index.js:8","message":"CSS import check","data":{"cssImported":true},"timestamp":1767595762613,"sessionId":"debug-session","runId":"run1","hypothesisId":"C"}

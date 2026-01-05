@@ -139,8 +139,8 @@ export default async function handler(req, res) {
 
   try {
     // Validate endpoint
-    if (!endpoint || (endpoint !== 'solscan' && endpoint !== 'birdeye' && endpoint !== 'helius')) {
-      return res.status(400).json({ success: false, error: 'Invalid endpoint. Use "solscan", "helius", or "birdeye"' });
+    if (!endpoint || (endpoint !== 'solscan' && endpoint !== 'birdeye' && endpoint !== 'helius' && endpoint !== 'helius-token' && endpoint !== 'coingecko' && endpoint !== 'dexscreener')) {
+      return res.status(400).json({ success: false, error: 'Invalid endpoint. Use "solscan", "helius", "birdeye", "helius-token", "coingecko", or "dexscreener"' });
     }
 
     let url = '';
@@ -182,6 +182,37 @@ export default async function handler(req, res) {
       }
       // BirdEye API endpoint for token data
       url = `https://public-api.birdeye.so/public/token_data?address=${mint}`;
+    } else if (endpoint === 'solscan') {
+      if (!mint && !wallet) {
+        return res.status(400).json({ success: false, error: 'Mint address or wallet required' });
+      }
+      // Solscan API endpoint for token metadata
+      if (mint) {
+        url = `https://api.solscan.io/token/meta?token=${mint}`;
+      } else {
+        url = `https://api.solscan.io/account/transfers?account=${wallet}&limit=100`;
+      }
+    } else if (endpoint === 'helius-token') {
+      if (!mint) {
+        return res.status(400).json({ success: false, error: 'Mint address required' });
+      }
+      // Helius API endpoint for token metadata
+      const heliusApiKey = process.env.HELIUS_API_KEY || '1ac688b0-f67c-4bd5-a95d-e8cdd82e17b5';
+      url = `https://api.helius.xyz/v0/token-metadata?api-key=${heliusApiKey}`;
+      // This endpoint requires POST with body
+    } else if (endpoint === 'coingecko') {
+      if (!mint) {
+        return res.status(400).json({ success: false, error: 'Mint address required' });
+      }
+      // CoinGecko API - first try to find Solana token by contract
+      // Note: CoinGecko uses different IDs, may need to map mint addresses
+      url = `https://api.coingecko.com/api/v3/coins/solana/contract/${mint}`;
+    } else if (endpoint === 'dexscreener') {
+      if (!mint) {
+        return res.status(400).json({ success: false, error: 'Mint address required' });
+      }
+      // DexScreener API for Solana tokens
+      url = `https://api.dexscreener.com/latest/dex/tokens/${mint}`;
     }
 
     // Make API request
@@ -199,16 +230,36 @@ export default async function handler(req, res) {
       const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
       
       try {
-        response = await fetch(url, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'application/json, text/plain, */*',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Referer': 'https://solscan.io/',
-            'Origin': 'https://solscan.io',
-          },
-          signal: controller.signal,
-        });
+        // Helius token metadata endpoint requires POST
+        if (endpoint === 'helius-token') {
+          response = await fetch(url, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ mintAccounts: [mint] }),
+            signal: controller.signal,
+          });
+        } else if (endpoint === 'coingecko' || endpoint === 'dexscreener') {
+          // CoinGecko and DexScreener don't need special headers
+          response = await fetch(url, {
+            headers: {
+              'Accept': 'application/json',
+            },
+            signal: controller.signal,
+          });
+        } else {
+          response = await fetch(url, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+              'Accept': 'application/json, text/plain, */*',
+              'Accept-Language': 'en-US,en;q=0.9',
+              'Referer': 'https://solscan.io/',
+              'Origin': 'https://solscan.io',
+            },
+            signal: controller.signal,
+          });
+        }
         clearTimeout(timeoutId);
       } catch (fetchError) {
         clearTimeout(timeoutId);
@@ -216,7 +267,7 @@ export default async function handler(req, res) {
           console.error('Request timeout after 8 seconds');
           return res.status(504).json({ 
             success: false, 
-            error: 'Request to Solscan API timed out. The API may be slow or unavailable.',
+            error: 'Request to API timed out. The API may be slow or unavailable.',
             type: 'timeout'
           });
         }
@@ -338,16 +389,39 @@ export default async function handler(req, res) {
               
               // Extract price - try multiple fields
               let priceUsd = 0;
+              
+              // Try direct price fields first
               if (transfer.priceUsd) {
                 priceUsd = typeof transfer.priceUsd === 'number' ? transfer.priceUsd : parseFloat(transfer.priceUsd);
               } else if (transfer.usdValue) {
                 priceUsd = typeof transfer.usdValue === 'number' ? transfer.usdValue : parseFloat(transfer.usdValue);
-              } else if (transfer.nativeTransfers && transfer.nativeTransfers.length > 0) {
-                // Try to calculate from SOL value if available
-                const solValue = transfer.nativeTransfers[0]?.amount || 0;
-                // Rough estimate: 1 SOL = $100 (this should be fetched from API in production)
-                priceUsd = (solValue / 1e9) * 100;
+              } else if (transfer.price) {
+                priceUsd = typeof transfer.price === 'number' ? transfer.price : parseFloat(transfer.price);
               }
+              
+              // If no direct price, try to calculate from native transfers (SOL)
+              if (priceUsd === 0 && tx.nativeTransfers && Array.isArray(tx.nativeTransfers)) {
+                const nativeTransfer = tx.nativeTransfers.find(nt => 
+                  (nt.fromUserAccount && nt.fromUserAccount.toLowerCase() === wallet) ||
+                  (nt.toUserAccount && nt.toUserAccount.toLowerCase() === wallet)
+                );
+                if (nativeTransfer && nativeTransfer.amount) {
+                  const solAmount = nativeTransfer.amount / 1e9; // Convert lamports to SOL
+                  const tokenAmount = transfer.tokenAmount || transfer.amount || 1;
+                  // Rough estimate: 1 SOL = $150 (should fetch from API)
+                  // Price per token = (SOL value * SOL price) / token amount
+                  priceUsd = (solAmount * 150) / tokenAmount;
+                }
+              }
+              
+              // If still no price, try to calculate from transaction fee or other indicators
+              if (priceUsd === 0 && tx.fee && transfer.tokenAmount) {
+                // Use fee as rough indicator (very rough estimate)
+                const feeInSol = tx.fee / 1e9;
+                priceUsd = (feeInSol * 150) / (transfer.tokenAmount || 1);
+              }
+              
+              console.log(`Token ${transfer.mint?.slice(0, 8)}: priceUsd=${priceUsd}, tokenAmount=${transfer.tokenAmount || transfer.amount}`);
               
               tokenTransfers.push({
                 mint: transfer.mint || transfer.tokenAddress || transfer.tokenMint,
@@ -372,19 +446,217 @@ export default async function handler(req, res) {
       }
     }
     
+    // Handle Solscan token metadata response
+    if (endpoint === 'solscan' && mint) {
+      if (data && typeof data === 'object') {
+        const result = {
+          symbol: data.symbol || data.tokenSymbol || '',
+          name: data.name || data.tokenName || data.displayName || '',
+          decimals: data.decimals || 9,
+          logoURI: data.logoURI || data.logo || data.image || '',
+          price: { usd: 0 }, // Solscan doesn't provide price in metadata endpoint
+          history: { ath: { value: 0, unixTime: null } },
+        };
+        return res.status(200).json({ success: true, data: result });
+      }
+    }
+    
+    // Handle Helius token metadata response
+    if (endpoint === 'helius-token') {
+      if (data && Array.isArray(data) && data.length > 0) {
+        const tokenData = data[0];
+        const result = {
+          symbol: tokenData.symbol || tokenData.tokenSymbol || '',
+          name: tokenData.name || tokenData.tokenName || tokenData.displayName || '',
+          decimals: tokenData.decimals || 9,
+          logoURI: tokenData.logoURI || tokenData.logo || tokenData.image || '',
+          price: { usd: 0 }, // Helius metadata doesn't provide price
+          history: { ath: { value: 0, unixTime: null } },
+        };
+        return res.status(200).json({ success: true, data: result });
+      }
+    }
+    
     // Handle BirdEye API response format
     if (endpoint === 'birdeye') {
-      // BirdEye returns data directly or wrapped in a 'data' property
+      // BirdEye returns data in various formats
       if (data && typeof data === 'object') {
-        if (data.data) {
-          data = data.data;
-        } else if (data.success === false || data.error) {
-          return res.status(400).json({ 
-            success: false, 
-            error: data.error || data.message || 'BirdEye API error' 
+        // Check for error first
+        if (data.success === false || data.error || data.message) {
+          console.log('BirdEye API error:', data.error || data.message);
+          // Don't return error, return empty data instead so frontend can handle it
+          return res.status(200).json({ 
+            success: true, 
+            data: {
+              price: { usd: 0 },
+              symbol: '',
+              name: '',
+              history: { ath: { value: 0, unixTime: null } },
+              decimals: 9,
+              logoURI: ''
+            }
           });
         }
-        // BirdEye might return the data directly
+        
+        // BirdEye can return data in different structures
+        // Common formats:
+        // 1. { data: { price: ..., symbol: ... } }
+        // 2. { price: ..., symbol: ... } (direct)
+        // 3. { result: { price: ..., symbol: ... } }
+        let tokenData = data;
+        if (data.data && typeof data.data === 'object') {
+          tokenData = data.data;
+        } else if (data.result && typeof data.result === 'object') {
+          tokenData = data.result;
+        }
+        
+        console.log('BirdEye tokenData keys:', Object.keys(tokenData));
+        console.log('BirdEye price structure:', tokenData.price);
+        console.log('BirdEye symbol:', tokenData.symbol);
+        console.log('BirdEye name:', tokenData.name);
+        
+        // Extract price - BirdEye API structure varies
+        let priceUsd = 0;
+        if (tokenData.price) {
+          if (typeof tokenData.price === 'number') {
+            priceUsd = tokenData.price;
+          } else if (typeof tokenData.price === 'object') {
+            priceUsd = tokenData.price.usd || tokenData.price.value || tokenData.price.price || 0;
+          }
+        } else if (tokenData.priceUsd) {
+          priceUsd = typeof tokenData.priceUsd === 'number' ? tokenData.priceUsd : parseFloat(tokenData.priceUsd) || 0;
+        }
+        
+        // Extract ATH
+        let athValue = 0;
+        let athTime = null;
+        if (tokenData.history && tokenData.history.ath) {
+          athValue = tokenData.history.ath.value || tokenData.history.ath.price || 0;
+          athTime = tokenData.history.ath.unixTime || tokenData.history.ath.timestamp || null;
+        } else if (tokenData.ath) {
+          if (typeof tokenData.ath === 'number') {
+            athValue = tokenData.ath;
+          } else if (typeof tokenData.ath === 'object') {
+            athValue = tokenData.ath.value || tokenData.ath.price || 0;
+            athTime = tokenData.ath.unixTime || tokenData.ath.timestamp || null;
+          }
+        }
+        
+        // Extract token metadata
+        const symbol = tokenData.symbol || tokenData.tokenSymbol || tokenData.symbolName || '';
+        const name = tokenData.name || tokenData.tokenName || tokenData.displayName || '';
+        
+        // Extract token information - BirdEye API structure
+        const result = {
+          // Price data
+          price: {
+            usd: priceUsd
+          },
+          // Token metadata
+          symbol: symbol,
+          name: name,
+          // ATH data
+          history: {
+            ath: {
+              value: athValue,
+              unixTime: athTime
+            }
+          },
+          // Additional metadata
+          decimals: tokenData.decimals || tokenData.tokenDecimals || 9,
+          logoURI: tokenData.logoURI || tokenData.logo || tokenData.image || '',
+        };
+        
+        console.log('BirdEye result:', JSON.stringify(result, null, 2));
+        
+        return res.status(200).json({ success: true, data: result });
+      }
+    }
+    
+    // Handle CoinGecko API response
+    if (endpoint === 'coingecko') {
+      if (data && typeof data === 'object') {
+        if (data.error) {
+          return res.status(404).json({ 
+            success: false, 
+            error: data.error || 'Token not found on CoinGecko' 
+          });
+        }
+        
+        // Check if it's a wrapped token
+        const platforms = data.platforms || {};
+        const isWrapped = Object.keys(platforms).length > 1 || (platforms.ethereum && platforms.solana);
+        const wrappedAddress = platforms.ethereum || platforms.bsc || platforms.polygon || null;
+        
+        const result = {
+          symbol: data.symbol || '',
+          name: data.name || '',
+          logoURI: data.image?.large || data.image?.small || '',
+          price: {
+            usd: data.market_data?.current_price?.usd || 0
+          },
+          marketCap: data.market_data?.market_cap?.usd || 0,
+          volume24h: data.market_data?.total_volume?.usd || 0,
+          priceChange24h: data.market_data?.price_change_percentage_24h || 0,
+          description: data.description?.en || '',
+          website: data.links?.homepage?.[0] || '',
+          twitter: data.links?.twitter_screen_name ? `https://twitter.com/${data.links.twitter_screen_name}` : '',
+          telegram: data.links?.telegram_channel_identifier ? `https://t.me/${data.links.telegram_channel_identifier}` : '',
+          platforms: platforms,
+          isWrapped: isWrapped,
+          wrappedTokenAddress: wrappedAddress,
+          history: {
+            ath: {
+              value: data.market_data?.ath?.usd || 0,
+              unixTime: data.market_data?.ath_date?.usd ? new Date(data.market_data.ath_date.usd).getTime() / 1000 : null
+            }
+          },
+          decimals: data.detail_platforms?.solana?.decimal_place || 9,
+        };
+        
+        return res.status(200).json({ success: true, data: result });
+      }
+    }
+    
+    // Handle DexScreener API response
+    if (endpoint === 'dexscreener') {
+      if (data && typeof data === 'object') {
+        if (data.pairs && Array.isArray(data.pairs) && data.pairs.length > 0) {
+          // Get the most liquid pair
+          const pair = data.pairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+          
+          const result = {
+            symbol: pair.baseToken?.symbol || '',
+            name: pair.baseToken?.name || '',
+            logoURI: pair.baseToken?.logoURI || pair.baseToken?.logo || '',
+            price: {
+              usd: parseFloat(pair.priceUsd) || 0
+            },
+            priceChange24h: parseFloat(pair.priceChange?.h24) || 0,
+            volume24h: parseFloat(pair.volume?.h24) || 0,
+            liquidity: parseFloat(pair.liquidity?.usd) || 0,
+            dex: pair.dexId || '',
+            pairAddress: pair.pairAddress || '',
+            marketCap: parseFloat(pair.fdv) || 0,
+            website: pair.info?.websiteUrl || '',
+            twitter: pair.info?.twitterUrl || '',
+            telegram: pair.info?.telegramUrl || '',
+            description: pair.info?.description || '',
+            history: {
+              ath: {
+                value: parseFloat(pair.athPrice) || 0,
+                unixTime: pair.athDate ? new Date(pair.athDate).getTime() / 1000 : null
+              }
+            },
+          };
+          
+          return res.status(200).json({ success: true, data: result });
+        } else {
+          return res.status(404).json({ 
+            success: false, 
+            error: 'No trading pairs found for this token' 
+          });
+        }
       }
     }
     

@@ -30,10 +30,15 @@ const PortfolioTimeline = ({ tokens, className = '' }) => {
         if (token.firstBuyDate && tokenDate >= token.firstBuyDate) {
           const heldAtDate = token.lastSellDate && tokenDate > token.lastSellDate 
             ? 0 
-            : (token.currentHeld || 0);
-          const priceAtDate = token.currentPrice || token.avgBuyPrice || 0;
-          actualValue += heldAtDate * priceAtDate;
-          whatIfValue += (token.totalBought || 0) * priceAtDate;
+            : Math.max(0, parseFloat(token.currentHeld) || 0);
+          const priceAtDate = Math.max(0, parseFloat(token.currentPrice) || parseFloat(token.avgBuyPrice) || 0);
+          const totalBought = Math.max(0, parseFloat(token.totalBought) || 0);
+          
+          const actualVal = heldAtDate * priceAtDate;
+          const whatIfVal = totalBought * priceAtDate;
+          
+          if (isFinite(actualVal)) actualValue += actualVal;
+          if (isFinite(whatIfVal)) whatIfValue += whatIfVal;
         }
       });
       

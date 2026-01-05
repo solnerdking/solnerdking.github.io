@@ -1,7 +1,24 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import GlassCard from './components/GlassCard';
+import PLChart from './components/PLChart';
+import PortfolioTimeline from './components/PortfolioTimeline';
+import ROIDistribution from './components/ROIDistribution';
+import TokenDistributionChart from './components/TokenDistributionChart';
+import PerformanceChart from './components/PerformanceChart';
+import LiveTicker from './components/LiveTicker';
+import AnimatedCounter from './components/AnimatedCounter';
+import Sparkline from './components/Sparkline';
+import LivePortfolio from './components/LivePortfolio';
+import Watchlist, { isInWatchlist, addToWatchlist as addToWatchlistUtil } from './components/Watchlist';
+import TokenComparison from './components/TokenComparison';
+import AdvancedAnalytics from './components/AdvancedAnalytics';
+import TradingInsights from './components/TradingInsights';
+import PriceAlerts from './components/PriceAlerts';
+import exportService from './utils/exportService';
+import cacheService from './services/cacheService';
+import { Star, Download, Share2, FileText, Bell } from 'lucide-react';
 
 const SolanaAnalyzer = () => {
   const [walletAddress, setWalletAddress] = useState('');
@@ -11,6 +28,12 @@ const SolanaAnalyzer = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [expandedTokens, setExpandedTokens] = useState(new Set());
   const [selectedTokenFromDropdown, setSelectedTokenFromDropdown] = useState('');
+  const [showWatchlist, setShowWatchlist] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+  const [showAlerts, setShowAlerts] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('missedGains');
+  const [dateFilter, setDateFilter] = useState('all');
 
   const toggleTokenExpand = (mint) => {
     setExpandedTokens(prev => {
@@ -65,8 +88,14 @@ const SolanaAnalyzer = () => {
           };
         }
         
-        const amount = transfer.tokenAmount || 0;
-        const priceUsd = transfer.priceUsd || 0;
+        // Get token amount - ensure it's a valid number
+        const amount = Math.max(0, parseFloat(transfer.tokenAmount) || 0);
+        
+        // Get price in USD - validate it's a positive number
+        let priceUsd = Math.max(0, parseFloat(transfer.priceUsd) || 0);
+        
+        // Note: If price is 0, it will be filled by BirdEye/DexScreener API later
+        // We don't calculate price here to avoid inaccurate estimates
         
         // Store transaction details
         tokenMap[mint].transactions.push({
@@ -78,40 +107,56 @@ const SolanaAnalyzer = () => {
         });
         
         if (transfer.fromUserAccount) {
-          // Selling
+          // Selling - only process if amount is valid
+          if (amount > 0) {
           tokenMap[mint].totalSold += amount;
-          tokenMap[mint].avgSellPrice = tokenMap[mint].sellCount === 0 
-            ? priceUsd 
-            : (tokenMap[mint].avgSellPrice * tokenMap[mint].sellCount + priceUsd) / (tokenMap[mint].sellCount + 1);
+            // Calculate weighted average sell price (only use valid prices > 0)
+            if (priceUsd > 0) {
+              if (tokenMap[mint].sellCount === 0) {
+                tokenMap[mint].avgSellPrice = priceUsd;
+              } else {
+                // Weighted average: (old_avg * old_count + new_price) / (old_count + 1)
+          tokenMap[mint].avgSellPrice = (tokenMap[mint].avgSellPrice * tokenMap[mint].sellCount + priceUsd) / (tokenMap[mint].sellCount + 1);
+              }
+              tokenMap[mint].sellPrices.push(priceUsd);
+            }
           tokenMap[mint].sellCount += 1;
-          tokenMap[mint].sellDates.push(txDate);
-          tokenMap[mint].sellPrices.push(priceUsd);
-          if (!tokenMap[mint].firstSellDate || txDate < tokenMap[mint].firstSellDate) {
-            tokenMap[mint].firstSellDate = txDate;
-          }
-          if (!tokenMap[mint].lastSellDate || txDate > tokenMap[mint].lastSellDate) {
-            tokenMap[mint].lastSellDate = txDate;
-          }
-          if (priceUsd > 0 && (tokenMap[mint].worstSellPrice === Infinity || priceUsd < tokenMap[mint].worstSellPrice)) {
-            tokenMap[mint].worstSellPrice = priceUsd;
+            tokenMap[mint].sellDates.push(txDate);
+            if (!tokenMap[mint].firstSellDate || txDate < tokenMap[mint].firstSellDate) {
+              tokenMap[mint].firstSellDate = txDate;
+            }
+            if (!tokenMap[mint].lastSellDate || txDate > tokenMap[mint].lastSellDate) {
+              tokenMap[mint].lastSellDate = txDate;
+            }
+            if (priceUsd > 0 && (tokenMap[mint].worstSellPrice === Infinity || priceUsd < tokenMap[mint].worstSellPrice)) {
+              tokenMap[mint].worstSellPrice = priceUsd;
+            }
           }
         } else {
-          // Buying
+          // Buying - only process if amount is valid
+          if (amount > 0) {
           tokenMap[mint].totalBought += amount;
-          tokenMap[mint].avgBuyPrice = tokenMap[mint].buyCount === 0
-            ? priceUsd
-            : (tokenMap[mint].avgBuyPrice * tokenMap[mint].buyCount + priceUsd) / (tokenMap[mint].buyCount + 1);
+            // Calculate weighted average buy price (only use valid prices > 0)
+            if (priceUsd > 0) {
+              if (tokenMap[mint].buyCount === 0) {
+                tokenMap[mint].avgBuyPrice = priceUsd;
+              } else {
+                // Weighted average: (old_avg * old_count + new_price) / (old_count + 1)
+          tokenMap[mint].avgBuyPrice = (tokenMap[mint].avgBuyPrice * tokenMap[mint].buyCount + priceUsd) / (tokenMap[mint].buyCount + 1);
+              }
+              tokenMap[mint].buyPrices.push(priceUsd);
+            }
           tokenMap[mint].buyCount += 1;
-          tokenMap[mint].buyDates.push(txDate);
-          tokenMap[mint].buyPrices.push(priceUsd);
-          if (!tokenMap[mint].firstBuyDate || txDate < tokenMap[mint].firstBuyDate) {
-            tokenMap[mint].firstBuyDate = txDate;
-          }
-          if (!tokenMap[mint].lastBuyDate || txDate > tokenMap[mint].lastBuyDate) {
-            tokenMap[mint].lastBuyDate = txDate;
-          }
-          if (priceUsd > 0 && priceUsd < tokenMap[mint].bestBuyPrice) {
-            tokenMap[mint].bestBuyPrice = priceUsd;
+            tokenMap[mint].buyDates.push(txDate);
+            if (!tokenMap[mint].firstBuyDate || txDate < tokenMap[mint].firstBuyDate) {
+              tokenMap[mint].firstBuyDate = txDate;
+            }
+            if (!tokenMap[mint].lastBuyDate || txDate > tokenMap[mint].lastBuyDate) {
+              tokenMap[mint].lastBuyDate = txDate;
+            }
+            if (priceUsd > 0 && priceUsd < tokenMap[mint].bestBuyPrice) {
+              tokenMap[mint].bestBuyPrice = priceUsd;
+            }
           }
         }
         tokenMap[mint].totalTransactions += 1;
@@ -140,52 +185,98 @@ const SolanaAnalyzer = () => {
     });
   };
 
-  // Calculate comprehensive metrics for a token
+  // Calculate comprehensive metrics for a token with validation
   const calculateTokenMetrics = (token) => {
-    const totalCost = token.totalBought * (token.avgBuyPrice || 0);
-    const actualProceeds = token.totalSold * (token.avgSellPrice || 0);
-    const currentValue = token.currentHeld * (token.currentPrice || 0);
+    // Validate and sanitize inputs
+    const totalBought = Math.max(0, parseFloat(token.totalBought) || 0);
+    const totalSold = Math.max(0, parseFloat(token.totalSold) || 0);
+    const currentHeld = Math.max(0, parseFloat(token.currentHeld) || 0);
+    const avgBuyPrice = Math.max(0, parseFloat(token.avgBuyPrice) || 0);
+    const avgSellPrice = Math.max(0, parseFloat(token.avgSellPrice) || 0);
+    const currentPrice = Math.max(0, parseFloat(token.currentPrice) || 0);
+    const ath = Math.max(0, parseFloat(token.ath) || 0);
     
-    // ROI
-    const roi = totalCost > 0 ? ((actualProceeds - totalCost) / totalCost) * 100 : 0;
+    // Calculate total cost (what was spent buying tokens)
+    const totalCost = totalBought * avgBuyPrice;
     
-    // What if held to current
-    const whatIfCurrentValue = token.totalBought * (token.currentPrice || token.avgBuyPrice || 0);
-    const missedGainsCurrent = whatIfCurrentValue - actualProceeds;
-    const roiIfHeldCurrent = totalCost > 0 ? ((whatIfCurrentValue - totalCost) / totalCost) * 100 : 0;
+    // Calculate actual proceeds (what was received from selling)
+    const actualProceeds = totalSold * avgSellPrice;
     
-    // What if held to ATH
-    const whatIfATHValue = token.totalBought * (token.ath || token.currentPrice || token.avgBuyPrice || 0);
-    const missedGainsATH = whatIfATHValue - actualProceeds;
-    const roiIfHeldATH = totalCost > 0 ? ((whatIfATHValue - totalCost) / totalCost) * 100 : 0;
+    // Calculate current value of held tokens
+    const currentValue = currentHeld * currentPrice;
     
-    // Time held
-    let timeHeldDays = 0;
-    if (token.firstBuyDate && token.lastSellDate) {
-      timeHeldDays = differenceInDays(token.lastSellDate, token.firstBuyDate);
-    } else if (token.firstBuyDate) {
-      timeHeldDays = differenceInDays(new Date(), token.firstBuyDate);
+    // Calculate actual ROI (based on what was sold vs what was spent)
+    // ROI = (Proceeds - Cost) / Cost * 100
+    // Only calculate if we actually sold something and had cost
+    let roi = 0;
+    if (totalCost > 0 && totalSold > 0) {
+      // For sold tokens, calculate ROI based on actual sales
+      const soldCost = (totalSold / totalBought) * totalCost; // Proportional cost of sold tokens
+      if (soldCost > 0) {
+        roi = ((actualProceeds - soldCost) / soldCost) * 100;
+      }
+    } else if (totalCost > 0 && totalSold === 0) {
+      // Never sold - ROI is based on current value vs cost
+      roi = ((currentValue - totalCost) / totalCost) * 100;
     }
     
-    // Price change
-    const priceChange = token.avgBuyPrice > 0 
-      ? ((token.currentPrice - token.avgBuyPrice) / token.avgBuyPrice) * 100 
+    // What if held ALL bought tokens to current price
+    const whatIfCurrentValue = totalBought * (currentPrice || avgBuyPrice || 0);
+    
+    // Missed gains = what we would have if held - what we actually got
+    // Only count missed gains if we actually sold something
+    const missedGainsCurrent = totalSold > 0 
+      ? Math.max(0, whatIfCurrentValue - actualProceeds)
       : 0;
+    
+    // ROI if held all tokens to current price
+    const roiIfHeldCurrent = totalCost > 0 
+      ? ((whatIfCurrentValue - totalCost) / totalCost) * 100 
+      : 0;
+    
+    // What if held to ATH
+    const athPrice = ath || currentPrice || avgBuyPrice || 0;
+    const whatIfATHValue = totalBought * athPrice;
+    const missedGainsATH = totalSold > 0
+      ? Math.max(0, whatIfATHValue - actualProceeds)
+      : 0;
+    const roiIfHeldATH = totalCost > 0 
+      ? ((whatIfATHValue - totalCost) / totalCost) * 100 
+      : 0;
+    
+    // Time held calculation
+    let timeHeldDays = 0;
+    if (token.firstBuyDate) {
+      const endDate = token.lastSellDate || new Date();
+      timeHeldDays = Math.max(0, differenceInDays(endDate, token.firstBuyDate));
+    }
+    
+    // Price change percentage
+    let priceChange = 0;
+    if (avgBuyPrice > 0 && currentPrice > 0) {
+      priceChange = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
+    }
+    
+    // Validate all calculations are finite numbers
+    const validateNumber = (val) => {
+      const num = parseFloat(val);
+      return isFinite(num) ? num : 0;
+    };
     
     return {
       ...token,
-      totalCost,
-      actualProceeds,
-      currentValue,
-      roi,
-      whatIfCurrentValue,
-      missedGainsCurrent,
-      roiIfHeldCurrent,
-      whatIfATHValue,
-      missedGainsATH,
-      roiIfHeldATH,
-      timeHeldDays,
-      priceChange,
+      totalCost: validateNumber(totalCost),
+      actualProceeds: validateNumber(actualProceeds),
+      currentValue: validateNumber(currentValue),
+      roi: validateNumber(roi),
+      whatIfCurrentValue: validateNumber(whatIfCurrentValue),
+      missedGainsCurrent: validateNumber(missedGainsCurrent),
+      roiIfHeldCurrent: validateNumber(roiIfHeldCurrent),
+      whatIfATHValue: validateNumber(whatIfATHValue),
+      missedGainsATH: validateNumber(missedGainsATH),
+      roiIfHeldATH: validateNumber(roiIfHeldATH),
+      timeHeldDays: Math.max(0, Math.round(timeHeldDays)),
+      priceChange: validateNumber(priceChange),
     };
   };
 
@@ -249,52 +340,267 @@ const SolanaAnalyzer = () => {
       const transactions = heliusData.data;
       const allTokens = analyzeAllTokens(transactions);
 
-      // Enrich tokens with BirdEye data - use current price as fallback for historical prices
+      // Enrich tokens with comprehensive metadata from multiple sources
       const enrichedTokens = await Promise.all(
         allTokens.map(async (token) => {
+          let symbol = token.symbol || '';
+          let name = token.name || '';
+          let currentPrice = 0;
+          let ath = 0;
+          let athDate = null;
+          let platform = 'Solana';
+          let developerWallet = null;
+          let creatorWallet = null;
+          let website = null;
+          let twitter = null;
+          let telegram = null;
+          let description = null;
+          let logoURI = null;
+          let isWrapped = false;
+          let wrappedTokenAddress = null;
+          let marketCap = 0;
+          let volume24h = 0;
+          let liquidity = 0;
+          let verified = false;
+          let decimals = 9;
+          
+          // Try DexScreener first for comprehensive token data
           try {
-            const birdeyeResponse = await fetch(`${backendUrl}?endpoint=birdeye&mint=${token.mint}`);
-            
-            if (birdeyeResponse.ok) {
-              const birdeyeData = await birdeyeResponse.json();
-              
-              if (birdeyeData.success && birdeyeData.data) {
-                const tokenInfo = birdeyeData.data;
-                // Try multiple paths for price data
-                const currentPrice = tokenInfo.price?.usd || 
-                                   tokenInfo.price || 
-                                   tokenInfo.data?.price?.usd ||
-                                   tokenInfo.data?.price ||
-                                   0;
-                const ath = tokenInfo.history?.ath?.value || 
-                          tokenInfo.ath?.value ||
-                          tokenInfo.data?.history?.ath?.value ||
-                          currentPrice;
+            const dexscreenerResponse = await fetch(`${backendUrl}?endpoint=dexscreener&mint=${token.mint}`);
+            if (dexscreenerResponse.ok) {
+              const dexscreenerData = await dexscreenerResponse.json();
+              if (dexscreenerData.success && dexscreenerData.data) {
+                const tokenInfo = dexscreenerData.data;
                 
-                // If we have current price but no historical prices, use current price as estimate
-                const estimatedBuyPrice = token.avgBuyPrice || currentPrice || 0;
-                const estimatedSellPrice = token.avgSellPrice || currentPrice || 0;
-                
-                return { 
-                  ...token, 
-                  currentPrice: currentPrice || 0,
-                  ath: ath || currentPrice || 0,
-                  athDate: tokenInfo.history?.ath?.unixTime ? new Date(tokenInfo.history.ath.unixTime * 1000) : null,
-                  // Update buy/sell prices if we have current price but no historical data
-                  avgBuyPrice: estimatedBuyPrice,
-                  avgSellPrice: estimatedSellPrice,
-                };
+                // Extract comprehensive data
+                if (tokenInfo.symbol) symbol = tokenInfo.symbol;
+                if (tokenInfo.name) name = tokenInfo.name;
+                if (tokenInfo.price?.usd) currentPrice = tokenInfo.price.usd;
+                if (tokenInfo.liquidity) liquidity = tokenInfo.liquidity;
+                if (tokenInfo.volume24h) volume24h = tokenInfo.volume24h;
+                if (tokenInfo.logoURI) logoURI = tokenInfo.logoURI;
+                if (tokenInfo.history?.ath?.value) {
+                  ath = tokenInfo.history.ath.value;
+                  athDate = tokenInfo.history.ath.unixTime ? new Date(tokenInfo.history.ath.unixTime * 1000) : null;
+                }
               }
             }
           } catch (e) {
-            console.log('BirdEye error:', e);
+            console.log('DexScreener error for', token.mint, ':', e);
           }
-          // Fallback: use current price estimate if available
+          
+          // Try BirdEye for price data and additional metadata
+          try {
+            const birdeyeResponse = await fetch(`${backendUrl}?endpoint=birdeye&mint=${token.mint}`);
+            if (birdeyeResponse.ok) {
+              const birdeyeData = await birdeyeResponse.json();
+              if (birdeyeData.success && birdeyeData.data) {
+                const tokenInfo = birdeyeData.data;
+                
+                // Extract price
+                if (!currentPrice) {
+                  currentPrice = tokenInfo.price?.usd || 
+                                (typeof tokenInfo.price === 'number' ? tokenInfo.price : 0) || 0;
+                }
+                
+                // Extract ATH
+                if (!ath) {
+                  ath = tokenInfo.history?.ath?.value || 
+                       (typeof tokenInfo.ath === 'number' ? tokenInfo.ath : 0) || 
+                       currentPrice || 0;
+                  athDate = tokenInfo.history?.ath?.unixTime ? new Date(tokenInfo.history.ath.unixTime * 1000) : null;
+                }
+                
+                // Update symbol and name if available and better
+                if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
+                if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
+                if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
+                if (tokenInfo.decimals) decimals = tokenInfo.decimals;
+              }
+            }
+          } catch (e) {
+            console.log('BirdEye error for', token.mint, ':', e);
+          }
+          
+          // Try CoinGecko for comprehensive metadata (if available)
+          try {
+            const coingeckoResponse = await fetch(`${backendUrl}?endpoint=coingecko&mint=${token.mint}`);
+            if (coingeckoResponse.ok) {
+              const coingeckoData = await coingeckoResponse.json();
+              if (coingeckoData.success && coingeckoData.data) {
+                const tokenInfo = coingeckoData.data;
+                
+                // Extract comprehensive metadata
+                if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
+                if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
+                if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
+                if (tokenInfo.marketCap) marketCap = tokenInfo.marketCap;
+                if (tokenInfo.volume24h && !volume24h) volume24h = tokenInfo.volume24h;
+                if (tokenInfo.description) description = tokenInfo.description;
+                if (tokenInfo.links?.homepage?.[0]) website = tokenInfo.links.homepage[0];
+                if (tokenInfo.links?.twitter_screen_name) twitter = `https://twitter.com/${tokenInfo.links.twitter_screen_name}`;
+                if (tokenInfo.links?.telegram_channel_identifier) telegram = `https://t.me/${tokenInfo.links.telegram_channel_identifier}`;
+                if (tokenInfo.platforms?.solana) {
+                  platform = 'Solana';
+                  // Check if it's a wrapped token
+                  if (tokenInfo.platforms.ethereum || tokenInfo.platforms.bsc) {
+                    isWrapped = true;
+                    wrappedTokenAddress = tokenInfo.platforms.ethereum || tokenInfo.platforms.bsc;
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            console.log('CoinGecko error for', token.mint, ':', e);
+          }
+          
+          // Try Solscan for developer/creator info
+          if ((!symbol || symbol === 'Unknown') || (!name || name === 'Unknown Token') || !developerWallet) {
+            try {
+              const solscanResponse = await fetch(`${backendUrl}?endpoint=solscan&mint=${token.mint}`);
+              if (solscanResponse.ok) {
+                const solscanData = await solscanResponse.json();
+                if (solscanData.success && solscanData.data) {
+                  const tokenInfo = solscanData.data;
+                  if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
+                  if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
+                  if (tokenInfo.creator || tokenInfo.authority) {
+                    developerWallet = tokenInfo.creator || tokenInfo.authority;
+                  }
+                  if (tokenInfo.owner) {
+                    creatorWallet = tokenInfo.owner;
+                  }
+                  if (tokenInfo.website) website = tokenInfo.website;
+                  if (tokenInfo.twitter) twitter = tokenInfo.twitter;
+                  if (tokenInfo.telegram) telegram = tokenInfo.telegram;
+                  if (tokenInfo.description) description = tokenInfo.description;
+                  if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
+                  if (tokenInfo.verified !== undefined) verified = tokenInfo.verified;
+                }
+              }
+            } catch (e) {
+              console.log('Solscan error for', token.mint, ':', e);
+            }
+          }
+          
+          // Try Helius for token metadata and creator info
+          if ((!symbol || symbol === 'Unknown') || (!name || name === 'Unknown Token') || !developerWallet) {
+            try {
+              const heliusResponse = await fetch(`${backendUrl}?endpoint=helius-token&mint=${token.mint}`);
+              if (heliusResponse.ok) {
+                const heliusData = await heliusResponse.json();
+                if (heliusData.success && heliusData.data && Array.isArray(heliusData.data) && heliusData.data.length > 0) {
+                  const tokenInfo = heliusData.data[0];
+                  if (tokenInfo.onChainMetadata?.metadata?.data?.name && (!name || name === 'Unknown Token')) {
+                    name = tokenInfo.onChainMetadata.metadata.data.name;
+                  }
+                  if (tokenInfo.onChainMetadata?.metadata?.data?.symbol && (!symbol || symbol === 'Unknown')) {
+                    symbol = tokenInfo.onChainMetadata.metadata.data.symbol;
+                  }
+                  if (tokenInfo.onChainMetadata?.metadata?.data?.uri) {
+                    // Try to fetch off-chain metadata
+                    try {
+                      const metadataResponse = await fetch(tokenInfo.onChainMetadata.metadata.data.uri);
+                      if (metadataResponse.ok) {
+                        const metadata = await metadataResponse.json();
+                        if (metadata.name && (!name || name === 'Unknown Token')) name = metadata.name;
+                        if (metadata.symbol && (!symbol || symbol === 'Unknown')) symbol = metadata.symbol;
+                        if (metadata.description) description = metadata.description;
+                        if (metadata.image && !logoURI) logoURI = metadata.image;
+                        if (metadata.website) website = metadata.website;
+                        if (metadata.twitter) twitter = metadata.twitter;
+                        if (metadata.telegram) telegram = metadata.telegram;
+                        if (metadata.creators && metadata.creators.length > 0) {
+                          developerWallet = metadata.creators[0].address;
+                        }
+                      }
+                    } catch (e) {
+                      console.log('Metadata URI fetch error:', e);
+                    }
+                  }
+                  if (tokenInfo.mintAuthority && !developerWallet) {
+                    developerWallet = tokenInfo.mintAuthority;
+                  }
+                  if (tokenInfo.freezeAuthority && !creatorWallet) {
+                    creatorWallet = tokenInfo.freezeAuthority;
+                  }
+                }
+              }
+            } catch (e) {
+              console.log('Helius token error for', token.mint, ':', e);
+            }
+          }
+          
+          // Try Solana Token List for verified tokens
+          try {
+            const tokenListResponse = await fetch('https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json');
+            if (tokenListResponse.ok) {
+              const tokenListData = await tokenListResponse.json();
+              const tokenFromList = tokenListData.tokens?.find(t => t.address === token.mint);
+              if (tokenFromList) {
+                if (tokenFromList.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenFromList.symbol;
+                if (tokenFromList.name && (!name || name === 'Unknown Token')) name = tokenFromList.name;
+                if (tokenFromList.logoURI && !logoURI) logoURI = tokenFromList.logoURI;
+                verified = true;
+                if (tokenFromList.decimals) decimals = tokenFromList.decimals;
+              }
+            }
+          } catch (e) {
+            console.log('Token list error:', e);
+          }
+          
+          // Final fallback: use mint address
+          if (!symbol || symbol === 'Unknown') {
+            symbol = token.mint.slice(0, 4).toUpperCase();
+          }
+          if (!name || name === 'Unknown Token') {
+            name = `${symbol} Token`;
+          }
+          
+          // Use transaction prices if available and > 0
+          // Only use current price as fallback if we have no transaction price data
+          // This ensures we don't use inaccurate estimates
+          let finalBuyPrice = token.avgBuyPrice > 0 ? token.avgBuyPrice : 0;
+          let finalSellPrice = token.avgSellPrice > 0 ? token.avgSellPrice : 0;
+          
+          // Only use current price as fallback if:
+          // 1. We have no transaction price data AND
+          // 2. We have a valid current price from API
+          // This prevents using $0 or inaccurate prices
+          if (finalBuyPrice === 0 && currentPrice > 0 && token.buyCount === 0) {
+            // Only use as fallback if we never had a buy price
+            finalBuyPrice = currentPrice;
+          }
+          if (finalSellPrice === 0 && currentPrice > 0 && token.sellCount === 0) {
+            // Only use as fallback if we never had a sell price
+            finalSellPrice = currentPrice;
+          }
+          
           return { 
             ...token, 
-            currentPrice: token.avgBuyPrice || 0,
-            ath: (token.avgBuyPrice || 0) * 1.2,
-            athDate: null,
+            symbol: symbol,
+            name: name,
+            currentPrice: currentPrice || 0,
+            ath: ath || currentPrice || 0,
+            athDate: athDate,
+            avgBuyPrice: finalBuyPrice,
+            avgSellPrice: finalSellPrice,
+            // Enhanced metadata
+            platform: platform,
+            developerWallet: developerWallet,
+            creatorWallet: creatorWallet,
+            website: website,
+            twitter: twitter,
+            telegram: telegram,
+            description: description,
+            logoURI: logoURI,
+            isWrapped: isWrapped,
+            wrappedTokenAddress: wrappedTokenAddress,
+            marketCap: marketCap,
+            volume24h: volume24h,
+            liquidity: liquidity,
+            verified: verified,
+            decimals: decimals,
           };
         })
       );
@@ -348,7 +654,7 @@ const SolanaAnalyzer = () => {
         tx.tokenTransfers?.some(tf => tf.fromUserAccount && tf.toUserAccount)
       );
 
-      setResults({
+      const resultsData = {
         walletAddress,
         allTokens: tokensWithMetrics,
         transactions,
@@ -369,11 +675,16 @@ const SolanaAnalyzer = () => {
           bestPerformer,
           worstPerformer,
           biggestMiss,
-          transactionCount: transactions.length,
+        transactionCount: transactions.length,
           totalTokens: tokensWithMetrics.length,
           jitterScore,
         },
-      });
+      };
+
+      // Cache the results
+      cacheService.cacheWalletAnalysis(walletAddress.trim(), resultsData);
+
+      setResults(resultsData);
     } catch (err) {
       setError(err.message || 'Error analyzing wallet. Try again.');
       console.error('Error:', err);
@@ -404,15 +715,48 @@ const SolanaAnalyzer = () => {
         break;
     }
     
-    // Sort by missed gains (descending)
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(t => 
+        (t.symbol || '').toLowerCase().includes(query) ||
+        (t.name || '').toLowerCase().includes(query) ||
+        (t.mint || '').toLowerCase().includes(query)
+      );
+    }
+    
+    // Apply date filter
+    if (dateFilter !== 'all') {
+      const now = new Date();
+      const daysAgo = dateFilter === '7d' ? 7 : 
+                     dateFilter === '30d' ? 30 : 
+                     dateFilter === '90d' ? 90 : 365;
+      const cutoff = new Date(now.getTime() - daysAgo * 24 * 60 * 60 * 1000);
+      
+      filtered = filtered.filter(t => {
+        if (t.firstBuyDate) return t.firstBuyDate >= cutoff;
+        if (t.lastSellDate) return t.lastSellDate >= cutoff;
+        return true;
+      });
+    }
+    
+    // Sort
     filtered.sort((a, b) => {
-      const aVal = a.missedGainsCurrent || 0;
-      const bVal = b.missedGainsCurrent || 0;
-      return bVal - aVal;
+      switch (sortBy) {
+        case 'roi':
+          return (b.roiIfHeldCurrent || 0) - (a.roiIfHeldCurrent || 0);
+        case 'holdTime':
+          return (b.timeHeldDays || 0) - (a.timeHeldDays || 0);
+        case 'symbol':
+          return (a.symbol || '').localeCompare(b.symbol || '');
+        case 'missedGains':
+        default:
+          return (b.missedGainsCurrent || 0) - (a.missedGainsCurrent || 0);
+      }
     });
     
     return filtered;
-  }, [results, activeTab]);
+  }, [results, activeTab, searchQuery, sortBy, dateFilter]);
 
   // Get top 3 tokens and rest for dropdown
   const top3Tokens = useMemo(() => {
@@ -429,10 +773,62 @@ const SolanaAnalyzer = () => {
     return results?.allTokens.find(t => t.mint === selectedTokenFromDropdown);
   }, [selectedTokenFromDropdown, results]);
 
-  // Get token image URL
-  const getTokenImageUrl = (mint) => {
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(mint.slice(0, 2))}&background=22c55e&color=fff&size=128&bold=true`;
+  // Get token image URL with multiple fallback sources
+  const getTokenImageUrl = (mint, symbol = '') => {
+    // Try multiple image sources
+    const sources = [
+      `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${mint}/logo.png`,
+      `https://img.raydium.io/${mint}`,
+      `https://assets.coingecko.com/coins/images/solana/${mint}/large.png`,
+      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol || mint.slice(0, 4))}&background=22c55e&color=fff&size=128&bold=true`,
+    ];
+    return sources[0]; // Return first source, onError will handle fallbacks
   };
+  
+  // Enhanced image component with multiple fallbacks
+  const TokenImage = React.memo(({ token, size = 'w-20 h-20', className = '' }) => {
+    const [imgSrc, setImgSrc] = useState(() => {
+      // Try logoURI first, then official token list, then fallback
+      return token.logoURI || 
+             `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`;
+    });
+    const [errorCount, setErrorCount] = useState(0);
+    
+    const fallbackSources = [
+      token.logoURI,
+      `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`,
+      `https://img.raydium.io/${token.mint}`,
+      `https://assets.coingecko.com/coins/images/solana/${token.mint}/large.png`,
+      `https://ui-avatars.com/api/?name=${encodeURIComponent(token.symbol || token.mint.slice(0, 4))}&background=22c55e&color=fff&size=128&bold=true`,
+    ];
+    
+    useEffect(() => {
+      // Reset when token changes
+      setImgSrc(token.logoURI || fallbackSources[1]);
+      setErrorCount(0);
+    }, [token.mint, token.logoURI]);
+    
+    const handleError = () => {
+      if (errorCount < fallbackSources.length - 1) {
+        const nextIndex = errorCount + 1;
+        setErrorCount(nextIndex);
+        setImgSrc(fallbackSources[nextIndex] || fallbackSources[fallbackSources.length - 1]);
+      }
+    };
+    
+    return (
+      <img
+        src={imgSrc}
+        alt={token.symbol || token.name || 'Token'}
+        className={`${size} rounded-lg object-cover bg-[#404040] ${className}`}
+        onError={handleError}
+        loading="lazy"
+      />
+    );
+  });
+  
+  TokenImage.displayName = 'TokenImage';
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -445,42 +841,104 @@ const SolanaAnalyzer = () => {
   const renderTokenCard = (token, index, showRank = true) => {
     const isExpanded = expandedTokens.has(token.mint);
     const rankColor = index === 0 ? 'bg-green-500' : index === 1 ? 'bg-yellow-500' : 'bg-gray-600';
-    
-    return (
+
+  return (
       <GlassCard
         key={token.mint}
+        data-token-mint={token.mint}
         className="w-full md:w-80 flex-shrink-0 p-6"
       >
         {showRank && (
           <div className="flex justify-between items-start mb-4">
             <div className={`w-8 h-8 ${rankColor} rounded-full flex items-center justify-center text-white font-bold text-sm`}>
               {index + 1}
-            </div>
-          </div>
+        </div>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                addToWatchlistUtil(token);
+                // Force re-render to update star state
+                setShowWatchlist(prev => !prev);
+                setShowWatchlist(prev => !prev);
+              }}
+              className={`p-1.5 rounded transition-all ${
+                isInWatchlist(token.mint)
+                  ? 'text-yellow-400 bg-yellow-400/20'
+                  : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10'
+              }`}
+              title={isInWatchlist(token.mint) ? 'Remove from watchlist' : 'Add to watchlist'}
+            >
+              <Star size={16} fill={isInWatchlist(token.mint) ? 'currentColor' : 'none'} />
+            </button>
+      </div>
         )}
         
         <div className="flex items-center gap-4 mb-4">
-          <img
-            src={getTokenImageUrl(token.mint)}
-            alt={token.symbol}
-            className="w-20 h-20 rounded-lg object-cover bg-[#404040]"
-            onError={(e) => {
-              e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(token.symbol)}&background=22c55e&color=fff&size=128&bold=true`;
-            }}
-          />
-          <div className="flex-1">
-            <h3 className="text-2xl font-bold text-white mb-1">{token.symbol}</h3>
-            <p className="text-gray-400 text-sm">{token.name}</p>
+          <div className="relative flex-shrink-0">
+            <TokenImage token={token} size="w-20 h-20" />
+            {token.currentPrice > 0 && (
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[#2a2a2a] animate-pulse" />
+            )}
+            {token.verified && (
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-[#2a2a2a] flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-2xl font-bold text-white truncate">{token.symbol || 'Unknown'}</h3>
+              {token.currentPrice > 0 && (
+                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded flex-shrink-0">
+                  LIVE
+                </span>
+              )}
+              {token.isWrapped && (
+                <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded flex-shrink-0">
+                  Wrapped
+                </span>
+              )}
+              {token.verified && (
+                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded flex-shrink-0">
+                  ✓ Verified
+                </span>
+              )}
+            </div>
+            <p className="text-gray-400 text-sm truncate" title={token.name}>{token.name || 'Unknown Token'}</p>
+            {token.platform && token.platform !== 'Solana' && (
+              <p className="text-gray-500 text-xs mt-0.5">Platform: {token.platform}</p>
+            )}
+            {/* Always show contract address in compact form */}
+            <p className="text-gray-500 text-xs mt-1 font-mono truncate" title={token.mint}>
+              CA: {token.mint.slice(0, 8)}...{token.mint.slice(-6)}
+            </p>
           </div>
         </div>
         
         <div className="mb-3">
-          <p className="text-green-500 text-3xl font-bold">
-            ${Math.round(token.missedGainsCurrent || token.whatIfCurrentValue || 0).toLocaleString()}
-          </p>
+          <div className="flex items-baseline gap-2">
+            <p className="text-green-500 text-3xl font-bold">
+              ${Math.round(token.missedGainsCurrent || token.whatIfCurrentValue || 0).toLocaleString()}
+            </p>
+            {token.currentPrice > 0 && token.avgBuyPrice > 0 && (
+              <span className={`text-xs font-medium ${
+                token.currentPrice >= token.avgBuyPrice ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {token.currentPrice >= token.avgBuyPrice ? '↑' : '↓'}
+              </span>
+            )}
+          </div>
           <p className="text-gray-500 text-sm mt-1">
             ({((token.roiIfHeldCurrent || 0).toFixed(2))}%)
           </p>
+          {token.buyPrices && token.buyPrices.length > 1 && (
+            <div className="mt-2 h-8">
+              <Sparkline 
+                data={token.buyPrices.concat(token.currentPrice || token.avgBuyPrice)} 
+                positive={token.currentPrice >= token.avgBuyPrice}
+              />
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
@@ -559,6 +1017,118 @@ const SolanaAnalyzer = () => {
               </div>
             </div>
             
+            {/* Token Metadata Section */}
+            <div className="pt-2 border-t border-[#404040]">
+              <p className="text-gray-500 mb-2 font-semibold">Token Information</p>
+              <div className="space-y-1.5 text-gray-400">
+                <div className="flex items-center gap-2">
+                  <span className="text-gray-500 w-24">Platform:</span>
+                  <span className="text-white">{token.platform || 'Solana'}</span>
+                  {token.isWrapped && (
+                    <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Wrapped</span>
+                  )}
+                  {token.verified && (
+                    <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded">✓ Verified</span>
+                  )}
+                </div>
+                {token.developerWallet && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-500 w-24">Developer:</span>
+                    <a 
+                      href={`https://solscan.io/account/${token.developerWallet}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-400 hover:text-green-300 font-mono text-xs break-all"
+                    >
+                      {token.developerWallet.slice(0, 8)}...{token.developerWallet.slice(-6)}
+                    </a>
+                  </div>
+                )}
+                {token.creatorWallet && token.creatorWallet !== token.developerWallet && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-500 w-24">Creator:</span>
+                    <a 
+                      href={`https://solscan.io/account/${token.creatorWallet}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-green-400 hover:text-green-300 font-mono text-xs break-all"
+                    >
+                      {token.creatorWallet.slice(0, 8)}...{token.creatorWallet.slice(-6)}
+                    </a>
+                  </div>
+                )}
+                {token.wrappedTokenAddress && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-500 w-24">Wrapped From:</span>
+                    <span className="text-white font-mono text-xs break-all">{token.wrappedTokenAddress}</span>
+                  </div>
+                )}
+                {token.marketCap > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 w-24">Market Cap:</span>
+                    <span className="text-white">${(token.marketCap / 1000000).toFixed(2)}M</span>
+                  </div>
+                )}
+                {token.volume24h > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 w-24">24h Volume:</span>
+                    <span className="text-white">${(token.volume24h / 1000).toFixed(2)}K</span>
+                  </div>
+                )}
+                {token.liquidity > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-500 w-24">Liquidity:</span>
+                    <span className="text-white">${(token.liquidity / 1000).toFixed(2)}K</span>
+                  </div>
+                )}
+                {token.description && (
+                  <div className="flex items-start gap-2">
+                    <span className="text-gray-500 w-24">Description:</span>
+                    <span className="text-white text-xs">{token.description.substring(0, 100)}{token.description.length > 100 ? '...' : ''}</span>
+                  </div>
+                )}
+              </div>
+              
+              {/* Social Links */}
+              {(token.website || token.twitter || token.telegram) && (
+                <div className="mt-2 pt-2 border-t border-[#404040]">
+                  <p className="text-gray-500 mb-1.5 text-xs">Links:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {token.website && (
+                      <a 
+                        href={token.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-400 hover:text-green-300 text-xs"
+                      >
+                        🌐 Website
+                      </a>
+                    )}
+                    {token.twitter && (
+                      <a 
+                        href={token.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-400 hover:text-green-300 text-xs"
+                      >
+                        🐦 Twitter
+                      </a>
+                    )}
+                    {token.telegram && (
+                      <a 
+                        href={token.telegram}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-400 hover:text-green-300 text-xs"
+                      >
+                        💬 Telegram
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
             {token.firstBuyDate && (
               <div className="pt-2 border-t border-[#404040]">
                 <p className="text-gray-500 mb-1">Transaction Dates</p>
@@ -581,11 +1151,68 @@ const SolanaAnalyzer = () => {
           </div>
         )}
         
-        <div className="pt-3 border-t border-[#404040] text-xs text-gray-400">
-          <p>CA: {token.mint.slice(0, 4)}...{token.mint.slice(-4)}</p>
+        <div className="pt-3 border-t border-[#404040] text-xs">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-gray-500 mb-1">Contract Address (CA):</p>
+              <p className="text-gray-300 font-mono break-all text-xs" title={token.mint}>
+                {token.mint}
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(token.mint);
+                  alert('Contract address copied to clipboard!');
+                }}
+                className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
+                title="Copy contract address"
+              >
+                Copy
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2 mt-2">
+            <a 
+              href={`https://solscan.io/token/${token.mint}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
+            >
+              View on Solscan →
+            </a>
+            <a 
+              href={`https://dexscreener.com/solana/${token.mint}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
+            >
+              DexScreener →
+            </a>
+            <a 
+              href={`https://birdeye.so/token/${token.mint}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
+            >
+              BirdEye →
+            </a>
+          </div>
         </div>
       </GlassCard>
     );
+  };
+
+  const handleTokenClick = (token) => {
+    setSelectedTokenFromDropdown(token.mint);
+    setActiveTab('dashboard');
+    // Scroll to token card
+    setTimeout(() => {
+      const element = document.querySelector(`[data-token-mint="${token.mint}"]`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 100);
   };
 
   return (
@@ -611,6 +1238,11 @@ const SolanaAnalyzer = () => {
         </div>
       </div>
 
+      {/* Live Ticker */}
+      {results && results.allTokens && results.allTokens.length > 0 && (
+        <LiveTicker tokens={results.allTokens} onTokenClick={handleTokenClick} />
+      )}
+
       <div className="max-w-7xl mx-auto px-6 py-6">
         {/* Search Input */}
         {!results && (
@@ -631,28 +1263,28 @@ const SolanaAnalyzer = () => {
             <div className="flex gap-4">
               <div className="flex-1 relative">
                 <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
-                <input
-                  type="text"
-                  value={walletAddress}
-                  onChange={(e) => setWalletAddress(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && fetchWalletData()}
-                  placeholder="Enter your Solana wallet address..."
+            <input
+              type="text"
+              value={walletAddress}
+              onChange={(e) => setWalletAddress(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && fetchWalletData()}
+              placeholder="Enter your Solana wallet address..."
                   className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all"
-                />
+            />
               </div>
-              <button
-                onClick={fetchWalletData}
-                disabled={loading}
+            <button
+              onClick={fetchWalletData}
+              disabled={loading}
                 className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold px-8 py-3 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Search size={20} />
-                {loading ? 'Analyzing...' : 'Analyze'}
-              </button>
-            </div>
+            >
+              <Search size={20} />
+              {loading ? 'Analyzing...' : 'Analyze'}
+            </button>
+          </div>
             {error && (
               <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 rounded-lg">
                 <p className="text-red-300 text-sm font-medium">{error}</p>
-              </div>
+        </div>
             )}
             <p className="text-gray-500 text-xs mt-3">Data sourced from Helius and BirdEye. Processing may take 10-30 seconds.</p>
           </GlassCard>
@@ -672,7 +1304,7 @@ const SolanaAnalyzer = () => {
                   placeholder="Enter wallet address..."
                   className="w-full bg-[#2a2a2a] border border-[#404040] rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all text-sm"
                 />
-              </div>
+                </div>
               <button
                 onClick={fetchWalletData}
                 disabled={loading}
@@ -681,7 +1313,7 @@ const SolanaAnalyzer = () => {
                 <Search size={18} />
                 {loading ? 'Analyzing...' : 'Search'}
               </button>
-            </div>
+              </div>
           </div>
         )}
 
@@ -690,7 +1322,7 @@ const SolanaAnalyzer = () => {
             {/* Navigation Tabs */}
             <div className="flex gap-4 border-b border-[#404040]">
               {tabs.map(tab => (
-                <button
+                  <button 
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
@@ -700,54 +1332,211 @@ const SolanaAnalyzer = () => {
                   }`}
                 >
                   {tab.label}
-                </button>
-              ))}
+                  </button>
+                ))}
+              <button
+                onClick={() => {
+                  setShowWatchlist(!showWatchlist);
+                  setShowComparison(false);
+                }}
+                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
+                  showWatchlist
+                    ? 'text-yellow-400 border-yellow-400'
+                    : 'text-gray-400 border-transparent hover:text-yellow-300'
+                }`}
+              >
+                <Star size={16} className="inline mr-2" fill={showWatchlist ? 'currentColor' : 'none'} />
+                Watchlist
+              </button>
+              <button
+                onClick={() => {
+                  setShowComparison(!showComparison);
+                  setShowWatchlist(false);
+                  setShowAlerts(false);
+                }}
+                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
+                  showComparison
+                    ? 'text-blue-400 border-blue-400'
+                    : 'text-gray-400 border-transparent hover:text-blue-300'
+                }`}
+              >
+                Compare
+              </button>
+              <button
+                onClick={() => {
+                  setShowAlerts(!showAlerts);
+                  setShowWatchlist(false);
+                  setShowComparison(false);
+                }}
+                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
+                  showAlerts
+                    ? 'text-purple-400 border-purple-400'
+                    : 'text-gray-400 border-transparent hover:text-purple-300'
+                }`}
+              >
+                <Bell size={16} className="inline mr-2" />
+                Alerts
+              </button>
+                </div>
+
+            {/* Watchlist Tab */}
+            {showWatchlist && (
+              <div className="mb-6">
+                <Watchlist tokens={results.allTokens} />
+              </div>
+            )}
+
+            {/* Comparison Tab */}
+            {showComparison && (
+              <div className="mb-6">
+                <TokenComparison tokens={results.allTokens} />
             </div>
+            )}
+
+            {/* Price Alerts Tab */}
+            {showAlerts && (
+              <div className="mb-6">
+                <PriceAlerts tokens={results.allTokens} />
+              </div>
+            )}
 
             {/* Dashboard Tab */}
             {activeTab === 'dashboard' && (
               <div className="space-y-6">
-                {/* Jitter Score */}
-                <GlassCard className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-gray-400 text-sm mb-2">Jitter Score</p>
-                      <p className="text-green-500 text-5xl font-bold">
-                        {results.summary.jitterScore || 0}
-                      </p>
-                      <p className="text-gray-500 text-xs mt-2">
-                        {results.summary.jitterScore >= 70 ? 'Highly Jittery' : 
-                         results.summary.jitterScore >= 40 ? 'Moderately Jittery' : 
-                         'Stable Trader'}
-                      </p>
+                {/* Live Portfolio & Jitter Score */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <LivePortfolio tokens={results.allTokens} />
+                  <GlassCard className="p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <p className="text-gray-400 text-sm mb-2">Jitter Score</p>
+                        <p className="text-green-500 text-5xl font-bold">
+                          {results.summary.jitterScore || 0}
+                        </p>
+                        <p className="text-gray-500 text-xs mt-2">
+                          {results.summary.jitterScore >= 70 ? 'Highly Jittery' : 
+                           results.summary.jitterScore >= 40 ? 'Moderately Jittery' : 
+                           'Stable Trader'}
+                        </p>
+                      </div>
                     </div>
+                    <div className="flex gap-2 pt-4 border-t border-[#404040]">
+                  <button 
+                        onClick={() => exportService.exportToCSV(results.allTokens, `jitterhands-${walletAddress.slice(0, 8)}`)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm"
+                        title="Export to CSV"
+                      >
+                        <Download size={16} />
+                        CSV
+                  </button>
+                      <button
+                        onClick={() => exportService.exportToPDF(results, walletAddress)}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm"
+                        title="Export to PDF"
+                      >
+                        <FileText size={16} />
+                        PDF
+                      </button>
+                      <button
+                        onClick={async () => {
+                          const result = await exportService.copyShareableLink(walletAddress, results);
+                          if (result.success) {
+                            alert('Shareable link copied to clipboard!');
+                          } else {
+                            alert('Failed to copy link. Please copy manually: ' + result.link);
+                          }
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm"
+                        title="Copy shareable link"
+                      >
+                        <Share2 size={16} />
+                        Share
+                      </button>
+              </div>
+                  </GlassCard>
+            </div>
+
+                {/* P&L Summary */}
+                <GlassCard className="p-6 hover:border-green-500 transition-all">
+                  <h3 className="text-xl font-bold text-white mb-4">Profit & Loss Summary</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="group relative">
+                      <p className="text-gray-400 text-xs mb-2">Total Invested</p>
+                      <p className="text-white text-2xl font-bold">
+                        $<AnimatedCounter value={results.summary.totalCost || 0} decimals={0} />
+                      </p>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
+                    </div>
+                    <div className="group relative">
+                      <p className="text-gray-400 text-xs mb-2">Total Proceeds</p>
+                      <p className="text-white text-2xl font-bold">
+                        $<AnimatedCounter value={results.summary.actualProceeds || 0} decimals={0} />
+                      </p>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
+                    </div>
+                    <div className="group relative">
+                      <p className="text-gray-400 text-xs mb-2">Net P&L</p>
+                      <p className={`text-2xl font-bold ${
+                        (results.summary.actualProceeds - results.summary.totalCost) >= 0 
+                          ? 'text-green-400' 
+                          : 'text-red-400'
+                      }`}>
+                        $<AnimatedCounter 
+                          value={(results.summary.actualProceeds || 0) - (results.summary.totalCost || 0)} 
+                          decimals={0} 
+                        />
+                      </p>
+                      <p className={`text-xs mt-1 ${
+                        (results.summary.actualProceeds - results.summary.totalCost) >= 0 
+                          ? 'text-green-400' 
+                          : 'text-red-400'
+                      }`}>
+                        ({results.summary.totalCost > 0 
+                          ? (((results.summary.actualProceeds - results.summary.totalCost) / results.summary.totalCost) * 100).toFixed(2)
+                          : 0}%)
+                      </p>
+                      <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${
+                        (results.summary.actualProceeds - results.summary.totalCost) >= 0 
+                          ? 'via-green-500/20' 
+                          : 'via-red-500/20'
+                      } to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg`} />
                   </div>
+                    <div className="group relative">
+                      <p className="text-gray-400 text-xs mb-2">Current Value</p>
+                      <p className="text-green-400 text-2xl font-bold">
+                        $<AnimatedCounter value={results.summary.totalCurrentValue || 0} decimals={0} />
+                      </p>
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
+                  </div>
+                </div>
                 </GlassCard>
 
                 {/* Wallet Summary */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">Total Invested</p>
-                    <p className="text-white text-lg font-semibold">
-                      ${Math.round(results.summary.totalCost || 0).toLocaleString()}
-                    </p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">Total Proceeds</p>
-                    <p className="text-white text-lg font-semibold">
-                      ${Math.round(results.summary.actualProceeds || 0).toLocaleString()}
-                    </p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">Current Value</p>
-                    <p className="text-green-400 text-lg font-semibold">
-                      ${Math.round(results.summary.totalCurrentValue || 0).toLocaleString()}
-                    </p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
                     <p className="text-gray-400 text-xs mb-2">Missed Gains</p>
                     <p className="text-red-400 text-lg font-semibold">
                       ${Math.round(results.summary.totalMissedGainsCurrent || 0).toLocaleString()}
+                    </p>
+                  </GlassCard>
+                  <GlassCard className="p-4">
+                    <p className="text-gray-400 text-xs mb-2">If Held to ATH</p>
+                    <p className="text-green-400 text-lg font-semibold">
+                      ${Math.round(results.summary.totalWhatIfATH || 0).toLocaleString()}
+                    </p>
+                  </GlassCard>
+                  <GlassCard className="p-4">
+                    <p className="text-gray-400 text-xs mb-2">Avg ROI</p>
+                    <p className={`text-lg font-semibold ${
+                      (results.summary.avgROI || 0) >= 0 ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {(results.summary.avgROI || 0).toFixed(2)}%
+                    </p>
+                  </GlassCard>
+                  <GlassCard className="p-4">
+                    <p className="text-gray-400 text-xs mb-2">Total Tokens</p>
+                    <p className="text-white text-lg font-semibold">
+                      {results.summary.totalTokens || 0}
                     </p>
                   </GlassCard>
                 </div>
@@ -758,33 +1547,78 @@ const SolanaAnalyzer = () => {
                   {results.currentlyHeld.length > 0 ? (
                     <div className="space-y-3">
                       {results.currentlyHeld.map((token) => (
-                        <div key={token.mint} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={getTokenImageUrl(token.mint)}
-                              alt={token.symbol}
-                              className="w-10 h-10 rounded"
-                            />
-                            <div>
-                              <p className="text-white font-semibold">{token.symbol}</p>
-                              <p className="text-gray-400 text-xs">{token.name}</p>
+                        <div key={token.mint} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg hover:bg-[#252525] transition">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="relative flex-shrink-0">
+                              <TokenImage token={token} size="w-12 h-12" />
+                              {token.verified && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border border-[#1a1a1a]" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-white font-semibold truncate">{token.symbol || 'Unknown'}</p>
+                                {token.isWrapped && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded flex-shrink-0">
+                                    Wrapped
+                                  </span>
+                                )}
+                                {token.verified && (
+                                  <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded flex-shrink-0">
+                                    ✓
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-gray-400 text-xs truncate" title={token.name}>{token.name || 'Unknown Token'}</p>
+                              <p className="text-gray-500 text-xs font-mono truncate mt-0.5" title={token.mint}>
+                                {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
+                              </p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-white font-semibold">
+                          <div className="text-right flex-shrink-0 ml-3">
+                            <p className="text-white font-semibold text-sm">
                               {(token.currentHeld || 0).toFixed(2)}
                             </p>
-                            <p className="text-green-400 text-sm">
+                            <p className="text-green-400 text-sm font-semibold">
                               ${Math.round(token.currentValue || 0).toLocaleString()}
                             </p>
+                            {token.currentPrice > 0 && (
+                              <p className="text-gray-500 text-xs mt-0.5">
+                                ${(token.currentPrice || 0).toFixed(6)}
+                              </p>
+                            )}
                           </div>
                         </div>
                       ))}
-                    </div>
+                          </div>
                   ) : (
                     <p className="text-gray-400 text-center py-4">No tokens currently held</p>
                   )}
                 </GlassCard>
+
+                {/* Charts Section */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* P&L Chart */}
+                  <PLChart tokens={results.allTokens} />
+                  
+                  {/* Portfolio Timeline */}
+                  <PortfolioTimeline tokens={results.allTokens} />
+                  
+                  {/* ROI Distribution */}
+                  <ROIDistribution tokens={results.allTokens} />
+                  
+                  {/* Token Distribution */}
+                  <TokenDistributionChart tokens={results.allTokens} />
+                          </div>
+
+                {/* Performance Chart - Full Width */}
+                <PerformanceChart tokens={results.allTokens} />
+
+                {/* Advanced Analytics & Trading Insights */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <AdvancedAnalytics tokens={results.allTokens} />
+                  <TradingInsights tokens={results.allTokens} />
+                          </div>
 
                 {/* Transaction History */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -803,16 +1637,16 @@ const SolanaAnalyzer = () => {
                     <p className="text-3xl font-bold text-blue-400">{results.transfers.length}</p>
                     <p className="text-gray-500 text-xs mt-1">Total transactions</p>
                   </GlassCard>
-                </div>
+                          </div>
 
                 {/* Top 3 Tokens */}
                 {top3Tokens.length > 0 && (
-                  <div>
+                          <div>
                     <h3 className="text-xl font-bold text-white mb-4">Top 3 Tokens</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {top3Tokens.map((token, index) => renderTokenCard(token, index, true))}
-                    </div>
-                  </div>
+                          </div>
+                        </div>
                 )}
 
                 {/* Rest of tokens dropdown */}
@@ -837,18 +1671,61 @@ const SolanaAnalyzer = () => {
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            )}
+                  )}
+                </div>
+              )}
 
             {/* Other Tabs (Paperhand, Roundtrip, Gained) */}
             {activeTab !== 'dashboard' && (
               <>
+                {/* Search and Filter Controls */}
+                <GlassCard className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                      <label className="text-gray-400 text-xs mb-2 block">Search Tokens</label>
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search by symbol, name, or address..."
+                        className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all text-sm"
+                      />
+                          </div>
+                          <div>
+                      <label className="text-gray-400 text-xs mb-2 block">Sort By</label>
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value)}
+                        className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-green-500 transition-all text-sm"
+                      >
+                        <option value="missedGains">Missed Gains</option>
+                        <option value="roi">ROI If Held</option>
+                        <option value="holdTime">Hold Time</option>
+                        <option value="symbol">Symbol (A-Z)</option>
+                      </select>
+                          </div>
+                          <div>
+                      <label className="text-gray-400 text-xs mb-2 block">Date Range</label>
+                      <select
+                        value={dateFilter}
+                        onChange={(e) => setDateFilter(e.target.value)}
+                        className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-green-500 transition-all text-sm"
+                      >
+                        <option value="all">All Time</option>
+                        <option value="7d">Last 7 Days</option>
+                        <option value="30d">Last 30 Days</option>
+                        <option value="90d">Last 90 Days</option>
+                        <option value="1y">Last Year</option>
+                      </select>
+                          </div>
+                  </div>
+                </GlassCard>
+
                 {/* Summary */}
                 {filteredAndSortedTokens.length > 0 && (
                   <div className="mb-6">
                     <div className="flex items-baseline gap-4">
-                      <div>
+                          <div>
                         <p className="text-gray-400 text-sm mb-2">Total Paperhanded</p>
                         <div className="flex items-baseline gap-3">
                           <span className="text-green-500 text-5xl font-bold">
@@ -857,20 +1734,28 @@ const SolanaAnalyzer = () => {
                           <span className="text-gray-500 text-lg">
                             ({filteredAndSortedTokens.length} tokens)
                           </span>
-                        </div>
+                          </div>
                       </div>
-                    </div>
-                  </div>
+                          </div>
+                          </div>
+                )}
+
+                {/* Charts for filtered tokens */}
+                {filteredAndSortedTokens.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    <PLChart tokens={filteredAndSortedTokens} />
+                    <ROIDistribution tokens={filteredAndSortedTokens} />
+                          </div>
                 )}
 
                 {/* Top 3 Tokens */}
                 {top3Tokens.length > 0 && (
-                  <div>
+                          <div>
                     <h3 className="text-xl font-bold text-white mb-4">Top 3 Tokens</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {top3Tokens.map((token, index) => renderTokenCard(token, index, true))}
-                    </div>
-                  </div>
+                          </div>
+                        </div>
                 )}
 
                 {/* Rest of tokens dropdown */}
@@ -893,9 +1778,9 @@ const SolanaAnalyzer = () => {
                       <div className="mt-4">
                         {renderTokenCard(selectedTokenData, restTokens.findIndex(t => t.mint === selectedTokenFromDropdown) + 3, false)}
                       </div>
-                    )}
-                  </div>
-                )}
+                  )}
+                </div>
+              )}
 
                 {filteredAndSortedTokens.length === 0 && (
                   <GlassCard className="p-12 text-center">
