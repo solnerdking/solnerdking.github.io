@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
+import { formatCurrency, formatPrice, formatPercentage, formatNumber, safeParseNumber, roundToDecimals } from './utils/numberFormatter';
 import GlassCard from './components/GlassCard';
 import PLChart from './components/PLChart';
 import PortfolioTimeline from './components/PortfolioTimeline';
@@ -16,6 +17,7 @@ import TokenComparison from './components/TokenComparison';
 import AdvancedAnalytics from './components/AdvancedAnalytics';
 import TradingInsights from './components/TradingInsights';
 import PriceAlerts from './components/PriceAlerts';
+import DonationSupport from './components/DonationSupport';
 import exportService from './utils/exportService';
 import cacheService from './services/cacheService';
 import { Star, Download, Share2, FileText, Bell } from 'lucide-react';
@@ -187,14 +189,14 @@ const SolanaAnalyzer = () => {
 
   // Calculate comprehensive metrics for a token with validation
   const calculateTokenMetrics = (token) => {
-    // Validate and sanitize inputs
-    const totalBought = Math.max(0, parseFloat(token.totalBought) || 0);
-    const totalSold = Math.max(0, parseFloat(token.totalSold) || 0);
-    const currentHeld = Math.max(0, parseFloat(token.currentHeld) || 0);
-    const avgBuyPrice = Math.max(0, parseFloat(token.avgBuyPrice) || 0);
-    const avgSellPrice = Math.max(0, parseFloat(token.avgSellPrice) || 0);
-    const currentPrice = Math.max(0, parseFloat(token.currentPrice) || 0);
-    const ath = Math.max(0, parseFloat(token.ath) || 0);
+    // Validate and sanitize inputs using safeParseNumber
+    const totalBought = Math.max(0, safeParseNumber(token.totalBought));
+    const totalSold = Math.max(0, safeParseNumber(token.totalSold));
+    const currentHeld = Math.max(0, safeParseNumber(token.currentHeld));
+    const avgBuyPrice = Math.max(0, safeParseNumber(token.avgBuyPrice));
+    const avgSellPrice = Math.max(0, safeParseNumber(token.avgSellPrice));
+    const currentPrice = Math.max(0, safeParseNumber(token.currentPrice));
+    const ath = Math.max(0, safeParseNumber(token.ath));
     
     // Calculate total cost (what was spent buying tokens)
     const totalCost = totalBought * avgBuyPrice;
@@ -257,26 +259,26 @@ const SolanaAnalyzer = () => {
       priceChange = ((currentPrice - avgBuyPrice) / avgBuyPrice) * 100;
     }
     
-    // Validate all calculations are finite numbers
+    // Validate all calculations are finite numbers using safeParseNumber and roundToDecimals
     const validateNumber = (val) => {
-      const num = parseFloat(val);
-      return isFinite(num) ? num : 0;
+      const num = safeParseNumber(val);
+      return isFinite(num) ? roundToDecimals(num, 2) : 0;
     };
     
     return {
       ...token,
-      totalCost: validateNumber(totalCost),
-      actualProceeds: validateNumber(actualProceeds),
-      currentValue: validateNumber(currentValue),
-      roi: validateNumber(roi),
-      whatIfCurrentValue: validateNumber(whatIfCurrentValue),
-      missedGainsCurrent: validateNumber(missedGainsCurrent),
-      roiIfHeldCurrent: validateNumber(roiIfHeldCurrent),
-      whatIfATHValue: validateNumber(whatIfATHValue),
-      missedGainsATH: validateNumber(missedGainsATH),
-      roiIfHeldATH: validateNumber(roiIfHeldATH),
+      totalCost: roundToDecimals(validateNumber(totalCost), 2),
+      actualProceeds: roundToDecimals(validateNumber(actualProceeds), 2),
+      currentValue: roundToDecimals(validateNumber(currentValue), 2),
+      roi: roundToDecimals(validateNumber(roi), 2),
+      whatIfCurrentValue: roundToDecimals(validateNumber(whatIfCurrentValue), 2),
+      missedGainsCurrent: roundToDecimals(validateNumber(missedGainsCurrent), 2),
+      roiIfHeldCurrent: roundToDecimals(validateNumber(roiIfHeldCurrent), 2),
+      whatIfATHValue: roundToDecimals(validateNumber(whatIfATHValue), 2),
+      missedGainsATH: roundToDecimals(validateNumber(missedGainsATH), 2),
+      roiIfHeldATH: roundToDecimals(validateNumber(roiIfHeldATH), 2),
       timeHeldDays: Math.max(0, Math.round(timeHeldDays)),
-      priceChange: validateNumber(priceChange),
+      priceChange: roundToDecimals(validateNumber(priceChange), 2),
     };
   };
 
@@ -810,19 +812,32 @@ const SolanaAnalyzer = () => {
       const symbol = token.symbol || token.mint.slice(0, 4);
       return [
         token.logoURI, // From API metadata (CoinGecko, DexScreener, etc.)
-        `https://pump.fun/${token.mint}.png`, // pump.fun CDN
-        `https://pump.monster/api/token/${token.mint}/image`, // Alternative pump.fun API
-        `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`, // Official token list
-        `https://img.raydium.io/${token.mint}`, // Raydium CDN
-        `https://static.jup.ag/tokens/${token.mint}.png`, // Jupiter aggregator
-        `https://assets.coingecko.com/coins/images/solana/${token.mint}/large.png`, // CoinGecko
-        `https://api.dexscreener.com/latest/dex/tokens/${token.mint}`, // DexScreener (may need API call)
-        `https://token-list-api.solana.cloud/v1/search?query=${token.mint}`, // Solana Cloud token list
-        `https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/assets/mainnet/${token.mint}/logo.png`, // JSDelivr CDN mirror
-        `https://arweave.net/${token.mint}`, // Arweave (some tokens store images here)
-        `https://ipfs.io/ipfs/${token.mint}`, // IPFS (some tokens use IPFS)
-        `https://gateway.pinata.cloud/ipfs/${token.mint}`, // Pinata IPFS gateway
-        `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=22c55e&color=fff&size=128&bold=true`, // Generated avatar (last resort)
+        // Pump.fun sources (priority for memecoins)
+        `https://pump.fun/${token.mint}.png`,
+        `https://pump.monster/api/token/${token.mint}/image`,
+        `https://pump.fun/api/token/${token.mint}/image`,
+        // Official Solana token list
+        `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`,
+        `https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/assets/mainnet/${token.mint}/logo.png`,
+        // DEX and aggregator CDNs
+        `https://img.raydium.io/${token.mint}`,
+        `https://static.jup.ag/tokens/${token.mint}.png`,
+        `https://assets.jup.ag/tokens/${token.mint}.png`,
+        // CoinGecko
+        `https://assets.coingecko.com/coins/images/solana/${token.mint}/large.png`,
+        // DexScreener (via API response, not direct image URL)
+        // Arweave (common for Solana NFTs and tokens)
+        `https://arweave.net/${token.mint}`,
+        `https://arweave.net/${token.mint}/logo.png`,
+        // IPFS gateways
+        `https://ipfs.io/ipfs/${token.mint}`,
+        `https://gateway.pinata.cloud/ipfs/${token.mint}`,
+        `https://cloudflare-ipfs.com/ipfs/${token.mint}`,
+        // Other launchpad sources
+        `https://api.moonshot.fun/token/${token.mint}/image`, // Moonshot launchpad
+        `https://api.step.finance/token/${token.mint}/logo`, // Step Finance
+        // Generated avatar (last resort)
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=22c55e&color=fff&size=128&bold=true`,
       ].filter(Boolean); // Remove null/undefined values
     }, [token.mint, token.logoURI, token.symbol]);
     
@@ -1243,8 +1258,11 @@ const SolanaAnalyzer = () => {
 
   return (
     <div className="min-h-screen animate-fade-in bg-[#1a1a1a]">
+      {/* Donation Support Banner - Top */}
+      <DonationSupport position="top" />
+      
       {/* Header */}
-      <div className="border-b border-[#404040] bg-[#1a1a1a] sticky top-0 z-50">
+      <div className="border-b border-[#404040] bg-[#1a1a1a] sticky top-[49px] z-50">
         <div className="max-w-7xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -1565,7 +1583,7 @@ const SolanaAnalyzer = () => {
                       {results.summary.totalTokens || 0}
                     </p>
                   </GlassCard>
-                </div>
+                          </div>
 
                 {/* Currently Held Tokens */}
                 <GlassCard className="p-6">
@@ -1580,7 +1598,7 @@ const SolanaAnalyzer = () => {
                               {token.verified && (
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border border-[#1a1a1a]" />
                               )}
-                            </div>
+                          </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <p className="text-white font-semibold truncate">{token.symbol || 'Unknown'}</p>
@@ -1594,12 +1612,12 @@ const SolanaAnalyzer = () => {
                                     ✓
                                   </span>
                                 )}
-                              </div>
+                        </div>
                               <p className="text-gray-400 text-xs truncate" title={token.name}>{token.name || 'Unknown Token'}</p>
                               <p className="text-gray-500 text-xs font-mono truncate mt-0.5" title={token.mint}>
                                 {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
                               </p>
-                            </div>
+                          </div>
                           </div>
                           <div className="text-right flex-shrink-0 ml-3">
                             <p className="text-white font-semibold text-sm">
@@ -1825,6 +1843,9 @@ const SolanaAnalyzer = () => {
           </div>
         )}
       </div>
+
+      {/* Donation Support Section - Bottom */}
+      <DonationSupport position="bottom" />
     </div>
   );
 };

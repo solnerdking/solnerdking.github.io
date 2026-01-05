@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import tickerService from '../services/tickerService';
+import { formatPrice, formatPercentage } from '../utils/numberFormatter';
 
 const LiveTicker = ({ tokens = [], onTokenClick }) => {
   const [prices, setPrices] = useState({});
@@ -22,19 +23,32 @@ const LiveTicker = ({ tokens = [], onTokenClick }) => {
     };
   }, [tokens]);
 
-  // Smooth scrolling animation
+  // Smooth scrolling animation - slowed down significantly
   useEffect(() => {
     if (!tickerRef.current) return;
 
     const ticker = tickerRef.current;
     let scrollPosition = 0;
+    let lastTime = 0;
+    const scrollSpeed = 0.5; // Pixels per frame (reduced from 1)
+    const targetFPS = 60;
+    const frameTime = 1000 / targetFPS;
 
-    const scroll = () => {
-      scrollPosition += 1;
-      if (scrollPosition >= ticker.scrollWidth - ticker.clientWidth) {
-        scrollPosition = 0;
+    const scroll = (currentTime) => {
+      if (!lastTime) lastTime = currentTime;
+      
+      const deltaTime = currentTime - lastTime;
+      
+      // Only scroll if enough time has passed (throttle to ~60fps)
+      if (deltaTime >= frameTime) {
+        scrollPosition += scrollSpeed;
+        if (scrollPosition >= ticker.scrollWidth - ticker.clientWidth) {
+          scrollPosition = 0;
+        }
+        ticker.scrollLeft = scrollPosition;
+        lastTime = currentTime;
       }
-      ticker.scrollLeft = scrollPosition;
+      
       animationRef.current = requestAnimationFrame(scroll);
     };
 
@@ -66,10 +80,10 @@ const LiveTicker = ({ tokens = [], onTokenClick }) => {
         {tickerTokens.map((token) => {
           const isPositive = token.priceChange >= 0;
           const priceDisplay = token.livePrice > 0 
-            ? `$${token.livePrice.toFixed(6)}` 
+            ? formatPrice(token.livePrice)
             : 'N/A';
           const changeDisplay = token.priceChange !== 0 
-            ? `${isPositive ? '+' : ''}${token.priceChange.toFixed(2)}%` 
+            ? formatPercentage(token.priceChange)
             : '0%';
 
           return (
