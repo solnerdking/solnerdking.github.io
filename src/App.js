@@ -31,12 +31,12 @@ const SolanaAnalyzer = () => {
   const analyzeAllTokens = (transactions) => {
     const tokenMap = {};
     
-    transactions.forEach(tx => {
+    transactions.forEach((tx, txIndex) => {
       if (!tx.tokenTransfers) return;
       const txTimestamp = tx.timestamp || tx.blockTime || Date.now() / 1000;
       const txDate = new Date(txTimestamp * 1000);
       
-      tx.tokenTransfers.forEach(transfer => {
+      tx.tokenTransfers.forEach((transfer, transferIndex) => {
         const mint = transfer.mint;
         if (!tokenMap[mint]) {
           tokenMap[mint] = {
@@ -66,6 +66,12 @@ const SolanaAnalyzer = () => {
         
         const amount = transfer.tokenAmount || 0;
         const priceUsd = transfer.priceUsd || 0;
+        // #region agent log
+        if (txIndex === 0 && transferIndex === 0) {
+          const mintShort = transfer.mint ? transfer.mint.slice(0,8) : 'unknown';
+          fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:70',message:'Price extraction check',data:{mint:mintShort,priceUsd,hasPriceUsd:!!transfer.priceUsd,transferKeys:Object.keys(transfer)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        }
+        // #endregion
         
         if (transfer.fromUserAccount) {
           // Selling
@@ -132,6 +138,10 @@ const SolanaAnalyzer = () => {
 
   // Calculate comprehensive metrics for a token
   const calculateTokenMetrics = (token) => {
+    // #region agent log
+    const mintShort = token.mint ? token.mint.slice(0,8) : 'unknown';
+    fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:139',message:'calculateTokenMetrics entry',data:{mint:mintShort,totalBought:token.totalBought,avgBuyPrice:token.avgBuyPrice,avgSellPrice:token.avgSellPrice,currentPrice:token.currentPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
     const totalCost = token.totalBought * token.avgBuyPrice;
     const actualProceeds = token.totalSold * token.avgSellPrice;
     const currentValue = token.currentHeld * (token.currentPrice || 0);
@@ -162,7 +172,7 @@ const SolanaAnalyzer = () => {
       ? ((token.currentPrice - token.avgBuyPrice) / token.avgBuyPrice) * 100 
       : 0;
     
-    return {
+    const result = {
       ...token,
       totalCost,
       actualProceeds,
@@ -177,6 +187,11 @@ const SolanaAnalyzer = () => {
       timeHeldDays,
       priceChange,
     };
+    // #region agent log
+    const mintShort2 = token.mint ? token.mint.slice(0,8) : 'unknown';
+    fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:189',message:'calculateTokenMetrics exit',data:{mint:mintShort2,totalCost,actualProceeds,currentValue,roi,missedGainsCurrent},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+    // #endregion
+    return result;
   };
 
   const fetchWalletData = async () => {
@@ -218,6 +233,10 @@ const SolanaAnalyzer = () => {
       
       const transactions = heliusData.data;
       const allTokens = analyzeAllTokens(transactions);
+      // #region agent log
+      const firstTokenMint = allTokens[0] && allTokens[0].mint ? allTokens[0].mint.slice(0,8) : 'none';
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:235',message:'After analyzeAllTokens',data:{tokenCount:allTokens.length,firstTokenMint,firstTokenAvgBuy:allTokens[0]?.avgBuyPrice,firstTokenAvgSell:allTokens[0]?.avgSellPrice},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
 
       // Enrich tokens with BirdEye data
       const enrichedTokens = await Promise.all(
@@ -230,6 +249,12 @@ const SolanaAnalyzer = () => {
               
               if (birdeyeData.success && birdeyeData.data) {
                 const tokenInfo = birdeyeData.data;
+                // #region agent log
+                const mintShort3 = token.mint ? token.mint.slice(0,8) : 'unknown';
+                const priceUsd = tokenInfo.price && tokenInfo.price.usd ? tokenInfo.price.usd : 0;
+                const ath = tokenInfo.history && tokenInfo.history.ath && tokenInfo.history.ath.value ? tokenInfo.history.ath.value : 0;
+                fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:250',message:'BirdEye success',data:{mint:mintShort3,priceUsd,ath},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+                // #endregion
                 return { 
                   ...token, 
                   currentPrice: tokenInfo.price?.usd || token.avgBuyPrice || 0,
@@ -240,7 +265,15 @@ const SolanaAnalyzer = () => {
             }
           } catch (e) {
             console.log('BirdEye error:', e);
+            // #region agent log
+            const mintShort4 = token.mint ? token.mint.slice(0,8) : 'unknown';
+            fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:264',message:'BirdEye error',data:{mint:mintShort4,error:e.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+            // #endregion
           }
+          // #region agent log
+          const mintShort5 = token.mint ? token.mint.slice(0,8) : 'unknown';
+          fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:268',message:'BirdEye fallback',data:{mint:mintShort5,avgBuyPrice:token.avgBuyPrice,currentPrice:token.avgBuyPrice||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+          // #endregion
           return { 
             ...token, 
             currentPrice: token.avgBuyPrice || 0,
@@ -353,6 +386,21 @@ const SolanaAnalyzer = () => {
     { id: 'roundtrip', label: 'Roundtrip' },
     { id: 'gained', label: 'Gained' },
   ];
+
+  // #region agent log
+  React.useEffect(() => {
+    const testEl = document.createElement('div');
+    testEl.className = 'flex gap-4 bg-green-500';
+    document.body.appendChild(testEl);
+    const computed = window.getComputedStyle(testEl);
+    const flexApplied = computed.display === 'flex';
+    const bgApplied = computed.backgroundColor !== 'rgba(0, 0, 0, 0)' && computed.backgroundColor !== 'transparent';
+    const display = computed.display;
+    const bgColor = computed.backgroundColor;
+    document.body.removeChild(testEl);
+    fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:399',message:'Tailwind class test',data:{flexApplied,bgApplied,display,bgColor},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+  }, []);
+  // #endregion
 
   return (
     <div className="min-h-screen animate-fade-in bg-[#1a1a1a]">
@@ -515,7 +563,18 @@ const SolanaAnalyzer = () => {
 
             {/* Token Cards - Horizontal Scrollable Row */}
             <div className="overflow-x-auto pb-4 -mx-6 px-6">
-              <div className="flex gap-4" style={{ minWidth: 'max-content' }}>
+              <div className="flex gap-4" style={{ minWidth: 'max-content' }} ref={(el) => {
+                if (el) {
+                  // #region agent log
+                  const computed = window.getComputedStyle(el);
+                  const display = computed.display;
+                  const flexDirection = computed.flexDirection;
+                  const gap = computed.gap;
+                  const hasFlexClass = el.classList.contains('flex');
+                  fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:568',message:'Layout container check',data:{display,flexDirection,gap,hasFlexClass},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
+                  // #endregion
+                }
+              }}>
                 {filteredAndSortedTokens.map((token, index) => {
                   const isSelected = selectedToken === token.mint;
                   const isExpanded = expandedTokens.has(token.mint);
