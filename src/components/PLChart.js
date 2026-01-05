@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine, Brush } from 'recharts';
 import { Download, Maximize2 } from 'lucide-react';
 import GlassCard from './GlassCard';
@@ -6,8 +6,9 @@ import GlassCard from './GlassCard';
 const PLChart = ({ tokens, className = '' }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [timeframe, setTimeframe] = useState('ALL');
+  
   // Generate P&L data over time
-  const generatePLData = () => {
+  const generatePLData = useCallback(() => {
     if (!tokens || tokens.length === 0) return [];
     
     // Collect all transaction dates
@@ -58,9 +59,11 @@ const PLChart = ({ tokens, className = '' }) => {
     });
     
     return data;
-  };
+  }, [tokens]);
 
-  const chartData = useMemo(() => generatePLData(), [tokens]);
+  const chartData = useMemo(() => {
+    return generatePLData();
+  }, [generatePLData]);
 
   const filteredData = useMemo(() => {
     if (!chartData || chartData.length === 0) return [];
@@ -81,8 +84,6 @@ const PLChart = ({ tokens, className = '' }) => {
   }
 
   const handleExport = () => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
     // This would require chart-to-image library - simplified for now
     alert('Export feature coming soon!');
   };

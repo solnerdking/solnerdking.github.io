@@ -38,7 +38,7 @@ const AnimatedCounter = ({ value, duration = 2000, decimals = 0, prefix = '', su
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [value, duration]);
+  }, [value, duration, displayValue]);
 
   const formattedValue = displayValue.toFixed(decimals);
   const parts = formattedValue.split('.');

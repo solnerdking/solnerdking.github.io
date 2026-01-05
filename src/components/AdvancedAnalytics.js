@@ -24,6 +24,15 @@ const AdvancedAnalytics = ({ tokens = [] }) => {
     const bestTradingHour = Object.entries(tradesByHour)
       .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
 
+    // Hold time distribution - define before use
+    const holdTimeRanges = [
+      { name: '< 1 day', min: 0, max: 1, count: 0 },
+      { name: '1-7 days', min: 1, max: 7, count: 0 },
+      { name: '7-30 days', min: 7, max: 30, count: 0 },
+      { name: '30-90 days', min: 30, max: 90, count: 0 },
+      { name: '> 90 days', min: 90, max: Infinity, count: 0 },
+    ];
+
     // Correlation analysis (tokens traded together)
     const tokenPairs = {};
     tokens.forEach((token, i) => {
@@ -79,15 +88,6 @@ const AdvancedAnalytics = ({ tokens = [] }) => {
         : 0;
       if (isFinite(drawdown) && drawdown > maxDrawdown) maxDrawdown = drawdown;
     });
-
-    // Hold time distribution
-    const holdTimeRanges = [
-      { name: '< 1 day', min: 0, max: 1, count: 0 },
-      { name: '1-7 days', min: 1, max: 7, count: 0 },
-      { name: '7-30 days', min: 7, max: 30, count: 0 },
-      { name: '30-90 days', min: 30, max: 90, count: 0 },
-      { name: '> 90 days', min: 90, max: Infinity, count: 0 },
-    ];
 
     tokens.forEach(token => {
       const days = token.timeHeldDays || 0;

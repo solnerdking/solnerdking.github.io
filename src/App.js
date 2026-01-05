@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { differenceInDays, format } from 'date-fns';
 import GlassCard from './components/GlassCard';
@@ -531,6 +531,29 @@ const SolanaAnalyzer = () => {
             }
           }
           
+          // Try Pump.fun for launchpad tokens (especially memecoins)
+          if (!logoURI || (!symbol || symbol === 'Unknown') || (!name || name === 'Unknown Token')) {
+            try {
+              const pumpfunResponse = await fetch(`${backendUrl}?endpoint=pumpfun&mint=${token.mint}`);
+              if (pumpfunResponse.ok) {
+                const pumpfunData = await pumpfunResponse.json();
+                if (pumpfunData.success && pumpfunData.data) {
+                  const tokenInfo = pumpfunData.data;
+                  if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
+                  if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
+                  if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
+                  if (tokenInfo.platform && platform === 'Solana') platform = tokenInfo.platform;
+                  if (tokenInfo.website && !website) website = tokenInfo.website;
+                  if (tokenInfo.twitter && !twitter) twitter = tokenInfo.twitter;
+                  if (tokenInfo.telegram && !telegram) telegram = tokenInfo.telegram;
+                  if (tokenInfo.description && !description) description = tokenInfo.description;
+                }
+              }
+            } catch (e) {
+              console.log('Pump.fun error for', token.mint, ':', e);
+            }
+          }
+          
           // Try Solana Token List for verified tokens
           try {
             const tokenListResponse = await fetch('https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json');
@@ -773,20 +796,7 @@ const SolanaAnalyzer = () => {
     return results?.allTokens.find(t => t.mint === selectedTokenFromDropdown);
   }, [selectedTokenFromDropdown, results]);
 
-  // Get token image URL with multiple fallback sources
-  const getTokenImageUrl = (mint, symbol = '') => {
-    // Try multiple image sources
-    const sources = [
-      `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${mint}/logo.png`,
-      `https://img.raydium.io/${mint}`,
-      `https://assets.coingecko.com/coins/images/solana/${mint}/large.png`,
-      `https://api.dexscreener.com/latest/dex/tokens/${mint}`,
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol || mint.slice(0, 4))}&background=22c55e&color=fff&size=128&bold=true`,
-    ];
-    return sources[0]; // Return first source, onError will handle fallbacks
-  };
-  
-  // Enhanced image component with multiple fallbacks
+  // Enhanced image component with multiple fallbacks including pump.fun and launchpads
   const TokenImage = React.memo(({ token, size = 'w-20 h-20', className = '' }) => {
     const [imgSrc, setImgSrc] = useState(() => {
       // Try logoURI first, then official token list, then fallback
@@ -795,25 +805,40 @@ const SolanaAnalyzer = () => {
     });
     const [errorCount, setErrorCount] = useState(0);
     
-    const fallbackSources = [
-      token.logoURI,
-      `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`,
-      `https://img.raydium.io/${token.mint}`,
-      `https://assets.coingecko.com/coins/images/solana/${token.mint}/large.png`,
-      `https://ui-avatars.com/api/?name=${encodeURIComponent(token.symbol || token.mint.slice(0, 4))}&background=22c55e&color=fff&size=128&bold=true`,
-    ];
+    // Comprehensive fallback sources including pump.fun and other launchpads
+    const getFallbackSources = useCallback(() => {
+      const symbol = token.symbol || token.mint.slice(0, 4);
+      return [
+        token.logoURI, // From API metadata (CoinGecko, DexScreener, etc.)
+        `https://pump.fun/${token.mint}.png`, // pump.fun CDN
+        `https://pump.monster/api/token/${token.mint}/image`, // Alternative pump.fun API
+        `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`, // Official token list
+        `https://img.raydium.io/${token.mint}`, // Raydium CDN
+        `https://static.jup.ag/tokens/${token.mint}.png`, // Jupiter aggregator
+        `https://assets.coingecko.com/coins/images/solana/${token.mint}/large.png`, // CoinGecko
+        `https://api.dexscreener.com/latest/dex/tokens/${token.mint}`, // DexScreener (may need API call)
+        `https://token-list-api.solana.cloud/v1/search?query=${token.mint}`, // Solana Cloud token list
+        `https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/assets/mainnet/${token.mint}/logo.png`, // JSDelivr CDN mirror
+        `https://arweave.net/${token.mint}`, // Arweave (some tokens store images here)
+        `https://ipfs.io/ipfs/${token.mint}`, // IPFS (some tokens use IPFS)
+        `https://gateway.pinata.cloud/ipfs/${token.mint}`, // Pinata IPFS gateway
+        `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=22c55e&color=fff&size=128&bold=true`, // Generated avatar (last resort)
+      ].filter(Boolean); // Remove null/undefined values
+    }, [token.mint, token.logoURI, token.symbol]);
     
     useEffect(() => {
       // Reset when token changes
-      setImgSrc(token.logoURI || fallbackSources[1]);
+      const sources = getFallbackSources();
+      setImgSrc(sources[0] || sources[1] || sources[sources.length - 1]);
       setErrorCount(0);
-    }, [token.mint, token.logoURI]);
+    }, [token.mint, token.logoURI, token.symbol, getFallbackSources]);
     
     const handleError = () => {
-      if (errorCount < fallbackSources.length - 1) {
+      const sources = getFallbackSources();
+      if (errorCount < sources.length - 1) {
         const nextIndex = errorCount + 1;
         setErrorCount(nextIndex);
-        setImgSrc(fallbackSources[nextIndex] || fallbackSources[fallbackSources.length - 1]);
+        setImgSrc(sources[nextIndex] || sources[sources.length - 1]);
       }
     };
     
@@ -824,6 +849,7 @@ const SolanaAnalyzer = () => {
         className={`${size} rounded-lg object-cover bg-[#404040] ${className}`}
         onError={handleError}
         loading="lazy"
+        crossOrigin="anonymous"
       />
     );
   });

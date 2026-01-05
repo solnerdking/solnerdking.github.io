@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import GlassCard from './GlassCard';
-import { X, TrendingUp, TrendingDown } from 'lucide-react';
+import { X } from 'lucide-react';
 
 const TokenComparison = ({ tokens = [] }) => {
   const [selectedTokens, setSelectedTokens] = useState([]);

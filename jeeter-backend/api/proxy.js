@@ -213,6 +213,13 @@ export default async function handler(req, res) {
       }
       // DexScreener API for Solana tokens
       url = `https://api.dexscreener.com/latest/dex/tokens/${mint}`;
+    } else if (endpoint === 'pumpfun') {
+      if (!mint) {
+        return res.status(400).json({ success: false, error: 'Mint address required' });
+      }
+      // Pump.fun API - try multiple endpoints
+      // Note: Pump.fun may not have a public API, but we can try common patterns
+      url = `https://frontend-api.pump.fun/coins/${mint}`;
     }
 
     // Make API request
@@ -240,11 +247,12 @@ export default async function handler(req, res) {
             body: JSON.stringify({ mintAccounts: [mint] }),
             signal: controller.signal,
           });
-        } else if (endpoint === 'coingecko' || endpoint === 'dexscreener') {
-          // CoinGecko and DexScreener don't need special headers
+        } else if (endpoint === 'coingecko' || endpoint === 'dexscreener' || endpoint === 'pumpfun') {
+          // CoinGecko, DexScreener, and Pump.fun don't need special headers
           response = await fetch(url, {
             headers: {
               'Accept': 'application/json',
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             },
             signal: controller.signal,
           });
@@ -658,6 +666,39 @@ export default async function handler(req, res) {
           });
         }
       }
+    }
+    
+    // Handle Pump.fun API response
+    if (endpoint === 'pumpfun') {
+      if (data && typeof data === 'object') {
+        // Pump.fun API structure may vary
+        const result = {
+          symbol: data.symbol || data.tokenSymbol || '',
+          name: data.name || data.tokenName || data.displayName || '',
+          decimals: data.decimals || 9,
+          logoURI: data.image || data.logo || data.logoURI || data.imageUrl || '',
+          price: { usd: data.priceUsd || data.price || 0 },
+          history: { ath: { value: data.ath || data.allTimeHigh || 0, unixTime: null } },
+          platform: 'pump.fun',
+          website: data.website || data.url || '',
+          twitter: data.twitter || data.twitterUrl || '',
+          telegram: data.telegram || data.telegramUrl || '',
+          description: data.description || '',
+        };
+        return res.status(200).json({ success: true, data: result });
+      }
+      // If pump.fun doesn't have the token, return empty data (don't error)
+      return res.status(200).json({ 
+        success: true, 
+        data: {
+          symbol: '',
+          name: '',
+          decimals: 9,
+          logoURI: '',
+          price: { usd: 0 },
+          history: { ath: { value: 0, unixTime: null } },
+        }
+      });
     }
     
     // Wrap response in the format expected by frontend
