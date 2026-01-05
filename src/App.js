@@ -20,7 +20,9 @@ import PriceAlerts from './components/PriceAlerts';
 import DonationSupport from './components/DonationSupport';
 import exportService from './utils/exportService';
 import cacheService from './services/cacheService';
-import { Star, Download, Share2, FileText, Bell } from 'lucide-react';
+import { Star, Download, Share2, FileText, Bell, Heart, Copy, Check } from 'lucide-react';
+
+const DONATION_WALLET = '7sLkaFqXtv5SqmUDHS8aE3uCk79f5gEUjMEpER1stSbV';
 
 const SolanaAnalyzer = () => {
   const [walletAddress, setWalletAddress] = useState('');
@@ -29,6 +31,9 @@ const SolanaAnalyzer = () => {
   const [results, setResults] = useState(null);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [expandedTokens, setExpandedTokens] = useState(new Set());
+  const [donationBalance, setDonationBalance] = useState({ sol: 0, usd: 0 });
+  const [donationLoading, setDonationLoading] = useState(true);
+  const [donationCopied, setDonationCopied] = useState(false);
   const [selectedTokenFromDropdown, setSelectedTokenFromDropdown] = useState('');
   const [showWatchlist, setShowWatchlist] = useState(false);
   const [showComparison, setShowComparison] = useState(false);
@@ -1256,24 +1261,114 @@ const SolanaAnalyzer = () => {
     }, 100);
   };
 
+  // Fetch donation wallet balance for header
+  useEffect(() => {
+    const fetchDonationBalance = async () => {
+      setDonationLoading(true);
+      try {
+        // Fetch SOL price
+        let solPrice = 150;
+        try {
+          const priceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+          const priceData = await priceResponse.json();
+          if (priceData.solana?.usd) {
+            solPrice = priceData.solana.usd;
+          }
+        } catch (e) {
+          console.log('Error fetching SOL price:', e);
+        }
+
+        // Fetch balance from Solana RPC
+        let lamports = 0;
+        const rpcEndpoints = [
+          'https://api.mainnet-beta.solana.com',
+          'https://solana-api.projectserum.com',
+          'https://rpc.ankr.com/solana',
+        ];
+
+        for (const endpoint of rpcEndpoints) {
+          try {
+            const balanceResponse = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 1,
+                method: 'getBalance',
+                params: [DONATION_WALLET],
+              }),
+            });
+            const balanceData = await balanceResponse.json();
+            if (balanceData.result?.value) {
+              lamports = balanceData.result.value;
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        const sol = lamports / 1e9;
+        const usd = sol * solPrice;
+        setDonationBalance({ sol, usd });
+      } catch (e) {
+        console.log('Error fetching donation balance:', e);
+      } finally {
+        setDonationLoading(false);
+      }
+    };
+
+    fetchDonationBalance();
+    const interval = setInterval(fetchDonationBalance, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const copyDonationAddress = () => {
+    navigator.clipboard.writeText(DONATION_WALLET);
+    setDonationCopied(true);
+    setTimeout(() => setDonationCopied(false), 2000);
+  };
+
   return (
     <div className="min-h-screen animate-fade-in bg-[#1a1a1a]">
-      {/* Donation Support Banner - Top */}
-      <DonationSupport position="top" />
-      
-      {/* Header */}
-      <div className="border-b border-[#404040] bg-[#1a1a1a] sticky top-[49px] z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+      {/* Merged Header with Donation Support */}
+      <div className="bg-gradient-to-r from-green-500/10 via-green-600/10 to-green-500/10 border-b border-green-500/30 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-6 py-3">
+          <div className="flex items-center justify-between gap-4">
+            {/* Left: Logo and Branding */}
             <div className="flex items-center gap-3">
               <span className="text-white text-2xl font-bold">JH</span>
               <span className="text-white text-xl">JitterHands.fun</span>
               <span className="text-gray-500 text-sm ml-2">BETA</span>
             </div>
+
+            {/* Center: Donation Info */}
+            <div className="flex-1 flex items-center justify-center gap-4 text-sm">
+              <div className="flex items-center gap-3">
+                <Heart size={16} className="text-green-400 animate-pulse" fill="currentColor" />
+                <span className="text-white font-semibold">Support JitterHands.fun</span>
+                <span className="text-gray-400">•</span>
+                <span className="text-gray-300">
+                  {donationLoading 
+                    ? 'Loading...' 
+                    : `${donationBalance.sol.toFixed(4)} SOL ($${donationBalance.usd.toFixed(2)})`
+                  }
+                </span>
+              </div>
+              <button
+                onClick={copyDonationAddress}
+                className="flex items-center gap-2 px-3 py-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg transition text-green-400 text-xs flex-shrink-0"
+              >
+                {donationCopied ? <Check size={14} /> : <Copy size={14} />}
+                {donationCopied ? 'Copied!' : 'Copy Address'}
+              </button>
+            </div>
+
+            {/* Right: Search Button */}
             <button
               onClick={fetchWalletData}
               disabled={loading}
-              className="bg-[#2a2a2a] border border-[#404040] text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:border-green-500 transition-all disabled:opacity-50"
+              className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 flex-shrink-0"
             >
               <Search size={18} />
               {loading ? 'Analyzing...' : 'Search'}

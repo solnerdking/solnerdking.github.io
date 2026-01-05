@@ -71,7 +71,7 @@ const LiveTicker = ({ tokens = [], onTokenClick }) => {
   }));
 
   return (
-    <div className="w-full bg-[#1a1a1a] border-b border-[#404040] overflow-hidden sticky top-[73px] z-40">
+    <div className="w-full bg-[#1a1a1a] border-b border-[#404040] overflow-hidden">
       <div 
         ref={tickerRef}
         className="flex gap-4 py-2 overflow-x-hidden"
