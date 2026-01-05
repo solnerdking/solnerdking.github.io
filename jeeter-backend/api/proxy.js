@@ -24,13 +24,114 @@ export default async function handler(req, res) {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  // Test endpoint to verify Helius API key works (must be before endpoint validation)
+  if (req.query.test === 'helius' && req.query.wallet) {
+    const heliusApiKey = process.env.HELIUS_API_KEY;
+    if (!heliusApiKey) {
+      return res.status(400).json({
+        success: false,
+        error: 'HELIUS_API_KEY not found in environment variables',
+        troubleshooting: [
+          '1. Verify in Vercel Dashboard → Settings → Environment Variables',
+          '2. Make sure variable name is exactly: HELIUS_API_KEY',
+          '3. Make sure it\'s set for Production environment',
+          '4. Redeploy after adding/updating the variable'
+        ]
+      });
+    }
+    
+    // Test the Helius API call
+    try {
+      const testUrl = `https://api.helius.xyz/v0/addresses/${req.query.wallet}/transactions?api-key=${heliusApiKey}&limit=5`;
+      console.log('Testing Helius API with URL:', testUrl.replace(heliusApiKey, 'HIDDEN'));
+      
+      const response = await fetch(testUrl);
+      const data = await response.json();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Helius API test successful',
+        apiKeyLength: heliusApiKey.length,
+        apiKeyPreview: `${heliusApiKey.substring(0, 8)}...`,
+        responseStatus: response.status,
+        responseOk: response.ok,
+        dataType: Array.isArray(data) ? 'array' : typeof data,
+        dataKeys: data && typeof data === 'object' ? Object.keys(data).slice(0, 10) : [],
+        dataPreview: data ? (Array.isArray(data) ? `Array with ${data.length} items` : (data.transactions ? `Object with transactions array (${data.transactions.length} items)` : 'Object')) : 'null'
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        error: error.message,
+        apiKeyLength: heliusApiKey.length,
+        apiKeyPreview: `${heliusApiKey.substring(0, 8)}...`
+      });
+    }
+  }
+
   // Health check endpoint
   if (req.query.health === 'check') {
+    // Try multiple ways to access the environment variable
+    const heliusKey1 = process.env.HELIUS_API_KEY;
+    const heliusKey2 = process.env['HELIUS_API_KEY'];
+    const heliusKey3 = globalThis.process?.env?.HELIUS_API_KEY;
+    
+    const heliusKey = heliusKey1 || heliusKey2 || heliusKey3;
+    
+    const allEnvKeys = Object.keys(process.env || {});
+    const apiRelatedKeys = allEnvKeys.filter(k => 
+      k.toUpperCase().includes('HELIUS') || 
+      k.toUpperCase().includes('API') || 
+      k.toUpperCase().includes('KEY')
+    ).slice(0, 15);
+    
+    // Check for common variations
+    const variations = {
+      HELIUS_API_KEY: process.env.HELIUS_API_KEY,
+      helius_api_key: process.env.helius_api_key,
+      HELIUS_KEY: process.env.HELIUS_KEY,
+      'HELIUS_API_KEY (bracket)': process.env['HELIUS_API_KEY'],
+    };
+    
+    // Log to console for Vercel logs
+    console.log('Health check - Environment variable check:', {
+      hasHeliusKey1: !!heliusKey1,
+      hasHeliusKey2: !!heliusKey2,
+      hasHeliusKey3: !!heliusKey3,
+      totalEnvKeys: allEnvKeys.length,
+      sampleKeys: allEnvKeys.slice(0, 10),
+      apiRelatedKeys: apiRelatedKeys
+    });
+    
     return res.status(200).json({ 
       success: true, 
       message: 'Backend is running',
       nodeVersion: process.version,
-      hasFetch: typeof fetch !== 'undefined'
+      hasFetch: typeof fetch !== 'undefined',
+      hasHeliusKey: !!heliusKey,
+      heliusKeyLength: heliusKey ? heliusKey.length : 0,
+      heliusKeyPreview: heliusKey ? `${heliusKey.substring(0, 8)}...` : 'not set',
+      envKeys: apiRelatedKeys,
+      totalEnvKeys: allEnvKeys.length,
+      variations: Object.keys(variations).map(k => ({ key: k, hasValue: !!variations[k] })),
+      note: 'If hasHeliusKey is false, the environment variable is not available. Check Vercel Dashboard → Settings → Environment Variables and ensure you redeployed after adding it.',
+      troubleshooting: [
+        '1. Verify HELIUS_API_KEY exists in Vercel Dashboard → Settings → Environment Variables',
+        '2. Ensure it\'s set for Production environment',
+        '3. Check the deployment timestamp is AFTER the env var was added/updated',
+        '4. If deployment is old, click Redeploy on the latest deployment',
+        '5. After redeploy, wait 1-2 minutes and test again'
+      ],
+      debug: {
+        processEnvType: typeof process.env,
+        hasProcessEnv: !!process.env,
+        sampleEnvKeys: allEnvKeys.slice(0, 10),
+        accessMethods: {
+          dotNotation: !!process.env.HELIUS_API_KEY,
+          bracketNotation: !!process.env['HELIUS_API_KEY'],
+          globalThis: !!globalThis.process?.env?.HELIUS_API_KEY
+        }
+      }
     });
   }
 
@@ -57,12 +158,21 @@ export default async function handler(req, res) {
         return res.status(400).json({ success: false, error: 'Wallet address required' });
       }
       // Helius requires API key - would need to be set as environment variable
-      const heliusApiKey = process.env.HELIUS_API_KEY;
+      // TEMPORARY: Fallback to hardcoded key for testing (REMOVE IN PRODUCTION)
+      const heliusApiKey = process.env.HELIUS_API_KEY || '1ac688b0-f67c-4bd5-a95d-e8cdd82e17b5';
+      console.log('Helius API key check:', {
+        hasKey: !!heliusApiKey,
+        keyLength: heliusApiKey ? heliusApiKey.length : 0,
+        envKeys: Object.keys(process.env).filter(k => k.includes('HELIUS') || k.includes('API'))
+      });
+      
       if (!heliusApiKey) {
+        console.error('HELIUS_API_KEY environment variable is not set');
         return res.status(400).json({ 
           success: false, 
-          error: 'Helius API requires an API key. Please configure HELIUS_API_KEY environment variable.',
-          note: 'Get a free API key at https://www.helius.dev'
+          error: 'Helius API requires an API key. Please configure HELIUS_API_KEY environment variable in Vercel.',
+          note: 'Get a free API key at https://www.helius.dev. After adding it, redeploy the backend.',
+          troubleshooting: '1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables. 2. Add HELIUS_API_KEY. 3. Redeploy the backend.'
         });
       }
       url = `https://api.helius.xyz/v0/addresses/${wallet}/transactions?api-key=${heliusApiKey}&limit=100`;
@@ -206,27 +316,55 @@ export default async function handler(req, res) {
         data = data.map(tx => {
           const tokenTransfers = [];
           
+          // Extract timestamp - Helius provides timestamp in various formats
+          let timestamp = null;
+          if (tx.timestamp) {
+            timestamp = typeof tx.timestamp === 'number' ? tx.timestamp : parseInt(tx.timestamp);
+          } else if (tx.blockTime) {
+            timestamp = typeof tx.blockTime === 'number' ? tx.blockTime : parseInt(tx.blockTime);
+          } else if (tx.date) {
+            timestamp = typeof tx.date === 'number' ? tx.date : new Date(tx.date).getTime() / 1000;
+          } else {
+            // Fallback to current time if no timestamp
+            timestamp = Math.floor(Date.now() / 1000);
+          }
+          
           // Helius returns token transfers in tx.tokenTransfers array
           if (tx.tokenTransfers && Array.isArray(tx.tokenTransfers)) {
             tx.tokenTransfers.forEach(transfer => {
               const fromAddr = (transfer.fromUserAccount || transfer.from || '').toLowerCase();
               const toAddr = (transfer.toUserAccount || transfer.to || '').toLowerCase();
               
+              // Extract price - try multiple fields
+              let priceUsd = 0;
+              if (transfer.priceUsd) {
+                priceUsd = typeof transfer.priceUsd === 'number' ? transfer.priceUsd : parseFloat(transfer.priceUsd);
+              } else if (transfer.usdValue) {
+                priceUsd = typeof transfer.usdValue === 'number' ? transfer.usdValue : parseFloat(transfer.usdValue);
+              } else if (transfer.nativeTransfers && transfer.nativeTransfers.length > 0) {
+                // Try to calculate from SOL value if available
+                const solValue = transfer.nativeTransfers[0]?.amount || 0;
+                // Rough estimate: 1 SOL = $100 (this should be fetched from API in production)
+                priceUsd = (solValue / 1e9) * 100;
+              }
+              
               tokenTransfers.push({
-                mint: transfer.mint || transfer.tokenAddress,
+                mint: transfer.mint || transfer.tokenAddress || transfer.tokenMint,
                 tokenSymbol: transfer.tokenSymbol || transfer.symbol || 'Unknown',
                 tokenName: transfer.tokenName || transfer.name || 'Unknown Token',
                 tokenAmount: transfer.tokenAmount || transfer.amount || 0,
-                priceUsd: transfer.priceUsd || transfer.usdValue || 0,
+                priceUsd: priceUsd,
                 fromUserAccount: wallet && fromAddr === wallet,
                 toUserAccount: wallet && toAddr === wallet,
               });
             });
           }
           
-          // Return transaction with tokenTransfers in expected format
+          // Return transaction with tokenTransfers and timestamp in expected format
           return {
             ...tx,
+            timestamp: timestamp,
+            blockTime: timestamp, // Also set blockTime for compatibility
             tokenTransfers: tokenTransfers.length > 0 ? tokenTransfers : undefined
           };
         });
