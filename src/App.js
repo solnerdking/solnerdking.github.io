@@ -57,13 +57,36 @@ const SolanaAnalyzer = () => {
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:57',message:'Fetching wallet data',data:{backendUrl,walletAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
-      const solscanResponse = await fetch(`${backendUrl}?endpoint=solscan&wallet=${walletAddress}`);
+      const solscanResponse = await fetch(`${backendUrl}?endpoint=helius&wallet=${walletAddress}`);
       
       // #region agent log
       fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:60',message:'Solscan response received',data:{ok:solscanResponse.ok,status:solscanResponse.status,statusText:solscanResponse.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
       // #endregion
       
-      if (!solscanResponse.ok) throw new Error('Failed to fetch wallet data from Solscan');
+      if (!solscanResponse.ok) {
+        // #region agent log
+        const errorText = await solscanResponse.text().catch(() => 'Could not read error');
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:66',message:'Backend error response',data:{status:solscanResponse.status,statusText:solscanResponse.statusText,errorText},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
+        // #endregion
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch (e) {
+          errorData = { error: errorText };
+        }
+        
+        // Provide helpful error messages based on status code
+        let errorMessage = errorData.error || errorData.message || 'Failed to fetch wallet data';
+        if (solscanResponse.status === 403) {
+          errorMessage = 'API is blocking requests. This may be due to rate limiting or API restrictions. Please try again in a few minutes.';
+        } else if (solscanResponse.status === 429) {
+          errorMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (solscanResponse.status === 504) {
+          errorMessage = 'Request timed out. Please try again.';
+        }
+        
+        throw new Error(errorMessage);
+      }
       
       const solscanData = await solscanResponse.json();
       
