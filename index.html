@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<!-- BASIC META -->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="index, follow">
+
+<!-- PAGE TITLE -->
+<title>HORSEDICK.MPEG (MPEG) - Solana Memecoin Launch</title>
+
+<!-- SEO DESCRIPTION -->
+<meta name="description" content="HORSEDICK.MPEG (MPEG) - A fair-launch memecoin on Solana. No presale. No insiders. Pure entertainment and on-chain truth.">
+
+<!-- OPEN GRAPH / TELEGRAM / DISCORD -->
+<meta property="og:title" content="HORSEDICK.MPEG (MPEG) - Now LIVE">
+<meta property="og:description" content="The most legendary memecoin on Solana. Fair launch. No insiders. On-chain truth. MPEG is LIVE.">
+<meta property="og:image" content="https://solnerdking.github.io/horsedick-hero.png">
+<meta property="og:url" content="https://solnerdking.github.io/">
+<meta property="og:type" content="website">
+
+<!-- X (TWITTER) CARD -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="HORSEDICK.MPEG (MPEG) - Now LIVE">
+<meta name="twitter:description" content="Fair launch memecoin on Solana. No presale. No insiders. Pure alpha. $MPEG is LIVE.">
+<meta name="twitter:image" content="https://solnerdking.github.io/horsedick-hero.png">
+<meta name="twitter:site" content="@SolNerdKing">
+
+<!-- FONTS -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Orbitron:wght@600;800;900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<style>
+:root{
+  --bg:#050012;
+  --panel:#0b0620;
+  --border:#2b1a55;
+  --accent:#a855f7;
+  --neon:#00ff66;
+  --text:#e9e7ff;
+}
+
+*{
+  box-sizing:border-box;
+  margin:0;
+  padding:0;
+}
+
+html, body {
+  height: 100%;
+}
+
+body{
+  background:radial-gradient(circle at top,#120033,#050012 60%);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  text-align:center;
+  overflow-x:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+main {
+  flex: 1;
+}
+
+/* ===== TOP LINKS ===== */
+.top-links{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:28px;
+  padding:20px 16px;
+  max-width:100%;
+}
+
+.top-links a{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  color:#fff;
+  text-decoration:none;
+  font-weight:600;
+  white-space:nowrap;
+}
+
+.top-links img{
+  height:28px;
+}
+
+.top-links .tg img{
+  height:34px;
+}
+
+/* ===== STEALTH HEADER ===== */
+.stealth{
+  margin-top:10px;
+  padding:0 16px;
+}
+
+.stealth h1{
+  font-family:'Bebas Neue',sans-serif;
+  letter-spacing:4px;
+  font-size:48px;
+}
+
+.stealth p{
+  opacity:.8;
+  margin-top:6px;
+}
+
+/* ===== HERO ===== */
+.hero{
+  position:relative;
+  margin:36px auto 20px;
+  max-width:1100px;
+  padding:0 16px;
+}
+
+.hero img{
+  width:100%;
+  height:auto;
+  border-radius:16px;
+  background:#18003a;
+  display:block;
+  margin:0 auto;
+}
+
+/* ===== COUNTDOWN ===== */
+.countdown{
+  position:absolute;
+  bottom:30%;
+  left:50%;
+  transform:translateX(-50%);
+  display:flex;
+  gap:16px;
+  background:rgba(8,5,30,.85);
+  padding:18px 22px;
+  border-radius:14px;
+  border:1px solid rgba(168,85,247,.4);
+}
+
+.cd-box{
+  width:90px;
+}
+
+.cd-value{
+  font-family:'Orbitron',monospace;
+  font-size:40px;
+  font-weight:900;
+  color:var(--neon);
+}
+
+.cd-label{
+  font-size:12px;
+  letter-spacing:1px;
+  opacity:.85;
+}
+
+/* ===== CONTAINERS ===== */
+.container{
+  max-width:900px;
+  margin:40px auto;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:16px;
+  padding:30px 20px;
+}
+
+/* Titles */
+.container h2{
+  font-family:'Bebas Neue',sans-serif;
+  font-size:36px;
+  margin-bottom:20px;
+  letter-spacing:3px;
+}
+
+/* Status grid */
+.status{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+  text-align:left;
+}
+
+.status div{
+  line-height:1.6;
+}
+
+.status div strong{
+  color:var(--accent);
+}
+
+/* Text */
+p{
+  line-height:1.7;
+  opacity:.9;
+}
+
+
+
+/* ===== PAGE STATUS ===== */
+.page-status {
+  text-align:center;
+  color:var(--text);
+  opacity:.6;
+  font-size:12px;
+  padding:20px 16px 0;
+  margin-bottom:10px;
+}
+
+/* ===== FOOTER DISCLAIMER ===== */
+footer {
+  background:rgba(0,0,0,.4);
+  border-top:1px solid var(--border);
+  padding:30px 20px;
+  margin-top:auto;
+  text-align:center;
+}
+
+.disclaimer {
+  max-width:900px;
+  margin:0 auto;
+  line-height:1.7;
+  opacity:.7;
+  font-size:12px;
+}
+
+.disclaimer strong {
+  color:var(--accent);
+}
+
+/* ===== MOBILE FIXES ===== */
+@media(max-width:768px){
+
+  /* Top links stack & center */
+  .top-links{
+    flex-direction:column;
+    gap:14px;
+  }
+
+  .top-links a{
+    white-space:normal;
+    word-break:break-all;
+    justify-content:center;
+  }
+
+  /* Countdown scaling */
+  .countdown{
+    bottom:32%;
+    gap:10px;
+    padding:14px 16px;
+  }
+
+  .cd-box{
+    width:64px;
+  }
+
+  .cd-value{
+    font-size:28px;
+  }
+
+  .cd-label{
+    font-size:10px;
+  }
+
+  /* Status becomes single column */
+  .status{
+    grid-template-columns:1fr;
+  }
+
+  /* Title size */
+  .stealth h1{
+    font-size:36px;
+  }
+
+  .container h2{
+    font-size:30px;
+  }
+
+  .tg-messages {
+    height:300px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<main>
+
+<!-- TOP LINKS -->
+<div class="top-links">
+  <a href="https://x.com/SolNerdKing" target="_blank">
+    <img src="x-logo.svg" alt="X">
+    https://x.com/SolNerdKing
+  </a>
+  <a class="tg" href="http://t.me/solnerdkingdom" target="_blank">
+    <img src="telegram-logo.svg" alt="Telegram">
+    http://t.me/solnerdkingdom
+  </a>
+</div>
+
+<!-- STEALTH -->
+<div class="stealth">
+  <img src="mpeg.png" alt="MPEG Logo" style="height:60px;margin-bottom:16px;filter:drop-shadow(0 0 10px rgba(168,85,247,.5));">
+  <h1>HORSEDICK.MPEG</h1>
+  <p>$MPEG • NOW LIVE ON SOLANA</p>
+</div>
+
+<!-- PAGE STATUS -->
+<div class="page-status">
+  This page was last updated on: January 1st 2026 @ 1:00 PM CST
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <img src="mpeg-hero.jpeg" alt="HORSEDICK.MPEG">
+</div>
+
+<!-- STATUS -->
+<div class="container">
+  <h2>Token Status</h2>
+  <div class="status">
+    <div><strong>Status:</strong> LIVE</div>
+    <div><strong>Network:</strong> Solana</div>
+    <div><strong>Coin Name:</strong> HORSEDICK.MPEG</div>
+    <div><strong>Ticker:</strong> $MPEG</div>
+    <div><strong>Contract Address:</strong> <code style="color:var(--neon);font-size:12px;">BK8vMY2CrJ4NC7JJxDmyEeNWBMystp925wpRM9nhpump</code></div>
+  </div>
+</div>
+
+<!-- NARRATIVE -->
+<div class="container">
+  <h2>The Legend</h2>
+  <p>
+    HORSEDICK.MPEG is here. No stealth. No presale. No insiders.
+    This is pure, unadulterated memecoin chaos — fair, transparent, and built on Solana's fastest network.
+    The Kingdom spoke. The Factory listened. And now, the legend rides.
+  </p>
+  <p style="margin-top:14px">
+    Buy. Hold. Ride. The Factory never stops. $MPEG is just the beginning.
+  </p>
+</div>
+
+<!-- TOKENOMICS -->
+<div class="container">
+  <h2>Launch Transparency & Tokenomics</h2>
+  <p>
+    • Fair launch — no presale or private allocations<br>
+    • Liquidity added at launch<br>
+    • Ownership renounced post-deployment<br>
+    • Anti-bot & fair-entry protections<br>
+    • On-chain buy alerts<br>
+    • Community-first distribution
+  </p>
+</div>
+
+<!-- TELEGRAM WIDGET -->
+<div class="tg-widget-container">
+  <h2>Live Updates</h2>
+  <script async src="https://telegram.org/js/telegram-widget.js?22" data-telegram-channel="@solnerdkingdom" data-width="100%" data-height="500"></script>
+  <div style="text-align:center;margin-top:16px;opacity:.6;font-size:12px;">
+    Official announcements & live updates • <a href="https://t.me/solnerdkingdom" target="_blank" style="color:var(--accent);text-decoration:none;">Join Channel</a>
+  </div>
+</div>
+
+</main>
+
+<!-- FOOTER DISCLAIMER -->
+<footer>
+  <div class="disclaimer">
+    <strong>⚠️ Disclaimer:</strong> This project and all memecoins are solely for entertainment purposes. This is not financial advice. Cryptocurrency investments carry significant risk, including the potential loss of principal. Do not invest more than you can afford to lose. Always conduct your own research (DYOR) and consult with a qualified financial advisor before making any investment decisions. The Kingdom Mint Factory and associated parties are not responsible for any financial losses incurred.
+  </div>
+</footer>
+
+<script>
+const launchDate = new Date("January 1, 2026 12:00:00 CST").getTime();
+
+setInterval(()=>{
+  const now = new Date().getTime();
+  let t = launchDate - now;
+  if(t<0) t=0;
+
+  const d = String(Math.floor(t/(1000*60*60*24))).padStart(2,'0');
+  const h = String(Math.floor((t/(1000*60*60))%24)).padStart(2,'0');
+  const m = String(Math.floor((t/(1000*60))%60)).padStart(2,'0');
+  const s = String(Math.floor((t/1000)%60)).padStart(2,'0');
+
+  document.getElementById("d").textContent=d;
+  document.getElementById("h").textContent=h;
+  document.getElementById("m").textContent=m;
+  document.getElementById("s").textContent=s;
+},1000);
+
+
+</script>
+
+</body>
+</html>
