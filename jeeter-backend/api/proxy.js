@@ -372,6 +372,22 @@ export default async function handler(req, res) {
       }
     }
     
+    // Handle BirdEye API response format
+    if (endpoint === 'birdeye') {
+      // BirdEye returns data directly or wrapped in a 'data' property
+      if (data && typeof data === 'object') {
+        if (data.data) {
+          data = data.data;
+        } else if (data.success === false || data.error) {
+          return res.status(400).json({ 
+            success: false, 
+            error: data.error || data.message || 'BirdEye API error' 
+          });
+        }
+        // BirdEye might return the data directly
+      }
+    }
+    
     // Wrap response in the format expected by frontend
     res.status(200).json({ success: true, data: data });
   } catch (error) {
