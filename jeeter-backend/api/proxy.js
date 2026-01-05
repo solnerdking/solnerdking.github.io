@@ -180,6 +180,7 @@ export default async function handler(req, res) {
       if (!mint) {
         return res.status(400).json({ success: false, error: 'Mint address required' });
       }
+      // BirdEye API endpoint for token data
       url = `https://public-api.birdeye.so/public/token_data?address=${mint}`;
     }
 
