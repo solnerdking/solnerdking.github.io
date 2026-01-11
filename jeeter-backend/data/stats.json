@@ -1,6 +1,6 @@
 {
   "visits": 1,
-  "walletScans": 1,
+  "walletScans": 0,
   "leaderboard": [
     {
       "walletAddress": "E6LSmJh3ijq2QNyipmJE4a9RQtSY7BmAUKfN3yter2vw",
@@ -14,8 +14,8 @@
       "totalCost": 0.38,
       "actualProceeds": 0.15,
       "totalCurrentValue": 0,
-      "lastUpdated": "2026-01-11T21:39:01.468Z"
+      "lastUpdated": "2026-01-11T21:48:40.686Z"
     }
   ],
-  "lastUpdated": "2026-01-11T21:48:40.252Z"
+  "lastUpdated": "2026-01-11T21:48:40.955Z"
 }
