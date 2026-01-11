@@ -1,58 +1,33 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { differenceInDays, format } from 'date-fns';
-import { formatCurrency, formatPrice, formatPercentage, formatNumber, safeParseNumber, roundToDecimals } from './utils/numberFormatter';
+import { Search } from 'lucide-react';
+import { differenceInDays } from 'date-fns';
+import { safeParseNumber, roundToDecimals } from './utils/numberFormatter';
 import GlassCard from './components/GlassCard';
-import PLChart from './components/PLChart';
-import PortfolioTimeline from './components/PortfolioTimeline';
-import ROIDistribution from './components/ROIDistribution';
-import TokenDistributionChart from './components/TokenDistributionChart';
-import PerformanceChart from './components/PerformanceChart';
 import LiveTicker from './components/LiveTicker';
-import AnimatedCounter from './components/AnimatedCounter';
-import Sparkline from './components/Sparkline';
-import LivePortfolio from './components/LivePortfolio';
-import Watchlist, { isInWatchlist, addToWatchlist as addToWatchlistUtil } from './components/Watchlist';
-import TokenComparison from './components/TokenComparison';
-import AdvancedAnalytics from './components/AdvancedAnalytics';
-import TradingInsights from './components/TradingInsights';
-import PriceAlerts from './components/PriceAlerts';
 import DonationSupport from './components/DonationSupport';
+import Leaderboard from './components/Leaderboard';
+import SearchModal from './components/SearchModal';
 import exportService from './utils/exportService';
 import cacheService from './services/cacheService';
-import { Star, Download, Share2, FileText, Bell, Heart, Copy, Check } from 'lucide-react';
-
-const DONATION_WALLET = '7sLkaFqXtv5SqmUDHS8aE3uCk79f5gEUjMEpER1stSbV';
+import statsService from './services/statsService';
+import { Share2, Copy, Check, ExternalLink, BarChart3, ArrowLeft } from 'lucide-react';
 
 const SolanaAnalyzer = () => {
   const [walletAddress, setWalletAddress] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState(null);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [expandedTokens, setExpandedTokens] = useState(new Set());
-  const [donationBalance, setDonationBalance] = useState({ sol: 0, usd: 0 });
-  const [donationLoading, setDonationLoading] = useState(true);
-  const [donationCopied, setDonationCopied] = useState(false);
-  const [selectedTokenFromDropdown, setSelectedTokenFromDropdown] = useState('');
-  const [showWatchlist, setShowWatchlist] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
-  const [showAlerts, setShowAlerts] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState('missedGains');
-  const [dateFilter, setDateFilter] = useState('all');
-
-  const toggleTokenExpand = (mint) => {
-    setExpandedTokens(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(mint)) {
-        newSet.delete(mint);
-      } else {
-        newSet.add(mint);
-      }
-      return newSet;
-    });
-  };
+  const [activeTab, setActiveTab] = useState('paperhand');
+  const [searchQuery] = useState('');
+  const [sortBy] = useState('missedGains');
+  const [dateFilter] = useState('all');
+  const [showSearchModal, setShowSearchModal] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState('');
+  const [leaderboardWallets, setLeaderboardWallets] = useState([]);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [selectedToken, setSelectedToken] = useState(null);
+  const [visitCount, setVisitCount] = useState(0);
+  const [walletScanCount, setWalletScanCount] = useState(0);
 
   // Backend URL configurable via environment variable
   const backendUrl = process.env.REACT_APP_API_URL || 'https://jeeter-backend.vercel.app/api/proxy';
@@ -78,6 +53,8 @@ const SolanaAnalyzer = () => {
             currentHeld: 0,
             avgBuyPrice: 0,
             avgSellPrice: 0,
+            totalBoughtValue: 0, // Total USD value of all bought tokens
+            totalSoldValue: 0, // Total USD value of all sold tokens
             bestBuyPrice: Infinity,
             worstSellPrice: Infinity,
             buyCount: 0,
@@ -121,9 +98,11 @@ const SolanaAnalyzer = () => {
             if (priceUsd > 0) {
               if (tokenMap[mint].sellCount === 0) {
                 tokenMap[mint].avgSellPrice = priceUsd;
+                tokenMap[mint].totalSoldValue = amount * priceUsd; // Track total USD value of sold tokens
               } else {
-                // Weighted average: (old_avg * old_count + new_price) / (old_count + 1)
-          tokenMap[mint].avgSellPrice = (tokenMap[mint].avgSellPrice * tokenMap[mint].sellCount + priceUsd) / (tokenMap[mint].sellCount + 1);
+                // Proper weighted average: (sum of (amount * price)) / (sum of amounts)
+                tokenMap[mint].totalSoldValue = (tokenMap[mint].totalSoldValue || 0) + (amount * priceUsd);
+                tokenMap[mint].avgSellPrice = tokenMap[mint].totalSoldValue / tokenMap[mint].totalSold;
               }
               tokenMap[mint].sellPrices.push(priceUsd);
             }
@@ -147,9 +126,11 @@ const SolanaAnalyzer = () => {
             if (priceUsd > 0) {
               if (tokenMap[mint].buyCount === 0) {
                 tokenMap[mint].avgBuyPrice = priceUsd;
+                tokenMap[mint].totalBoughtValue = amount * priceUsd; // Track total USD value of bought tokens
               } else {
-                // Weighted average: (old_avg * old_count + new_price) / (old_count + 1)
-          tokenMap[mint].avgBuyPrice = (tokenMap[mint].avgBuyPrice * tokenMap[mint].buyCount + priceUsd) / (tokenMap[mint].buyCount + 1);
+                // Proper weighted average: (sum of (amount * price)) / (sum of amounts)
+                tokenMap[mint].totalBoughtValue = (tokenMap[mint].totalBoughtValue || 0) + (amount * priceUsd);
+                tokenMap[mint].avgBuyPrice = tokenMap[mint].totalBoughtValue / tokenMap[mint].totalBought;
               }
               tokenMap[mint].buyPrices.push(priceUsd);
             }
@@ -198,16 +179,41 @@ const SolanaAnalyzer = () => {
     const totalBought = Math.max(0, safeParseNumber(token.totalBought));
     const totalSold = Math.max(0, safeParseNumber(token.totalSold));
     const currentHeld = Math.max(0, safeParseNumber(token.currentHeld));
-    const avgBuyPrice = Math.max(0, safeParseNumber(token.avgBuyPrice));
-    const avgSellPrice = Math.max(0, safeParseNumber(token.avgSellPrice));
+    let avgBuyPrice = Math.max(0, safeParseNumber(token.avgBuyPrice));
+    let avgSellPrice = Math.max(0, safeParseNumber(token.avgSellPrice));
     const currentPrice = Math.max(0, safeParseNumber(token.currentPrice));
     const ath = Math.max(0, safeParseNumber(token.ath));
     
+    // Use totalBoughtValue/totalSoldValue if available (more accurate - actual USD spent/received)
+    // Otherwise fall back to calculated average
+    let totalBoughtValue = safeParseNumber(token.totalBoughtValue);
+    let totalSoldValue = safeParseNumber(token.totalSoldValue);
+    
+    // Recalculate average prices from total values if available (more accurate)
+    if (totalBoughtValue > 0 && totalBought > 0) {
+      avgBuyPrice = totalBoughtValue / totalBought;
+    }
+    if (totalSoldValue > 0 && totalSold > 0) {
+      avgSellPrice = totalSoldValue / totalSold;
+    }
+    
+    // If totalBoughtValue/totalSoldValue are 0 but we have valid average prices and amounts,
+    // recalculate them using the updated average prices (from API fetches)
+    // This handles cases where transaction prices weren't available initially but were fetched later
+    if (totalBoughtValue === 0 && totalBought > 0 && avgBuyPrice > 0) {
+      totalBoughtValue = totalBought * avgBuyPrice;
+    }
+    if (totalSoldValue === 0 && totalSold > 0 && avgSellPrice > 0) {
+      totalSoldValue = totalSold * avgSellPrice;
+    }
+    
     // Calculate total cost (what was spent buying tokens)
-    const totalCost = totalBought * avgBuyPrice;
+    // Use totalBoughtValue if available (actual USD spent), otherwise calculate from average
+    const totalCost = totalBoughtValue > 0 ? totalBoughtValue : (totalBought * avgBuyPrice);
     
     // Calculate actual proceeds (what was received from selling)
-    const actualProceeds = totalSold * avgSellPrice;
+    // Use totalSoldValue if available (actual USD received), otherwise calculate from average
+    const actualProceeds = totalSoldValue > 0 ? totalSoldValue : (totalSold * avgSellPrice);
     
     // Calculate current value of held tokens
     const currentValue = currentHeld * currentPrice;
@@ -230,10 +236,48 @@ const SolanaAnalyzer = () => {
     // What if held ALL bought tokens to current price
     const whatIfCurrentValue = totalBought * (currentPrice || avgBuyPrice || 0);
     
-    // Missed gains = what we would have if held - what we actually got
-    // Only count missed gains if we actually sold something
+    // MISSED GAINS CALCULATION (per spec):
+    // Missed Gains = max(0, (tokensSold × referencePriceAfterSell) − solReceived)
+    // Reference price = highest price after the user's final sell (default: ATH if after sell date, else current price)
+    // Do NOT include any price action before the sell
+    // Missed gains can never be negative
+    // Use the final sell timestamp for all calculations
+    
+    let referencePriceAfterSell = 0;
+    if (totalSold > 0 && token.lastSellDate) {
+      try {
+        const lastSellDate = token.lastSellDate instanceof Date 
+          ? token.lastSellDate 
+          : new Date(token.lastSellDate);
+        const athDate = token.athDate instanceof Date 
+          ? token.athDate 
+          : (token.athDate ? new Date(token.athDate) : null);
+        
+        // Reference price = highest price after final sell
+        // Use ATH if it occurred after the final sell, otherwise use current price
+        if (ath && athDate && !isNaN(athDate.getTime()) && athDate > lastSellDate) {
+          referencePriceAfterSell = ath;
+        } else if (currentPrice > 0) {
+          // Use current price as reference (represents highest price after sell if ATH was before sell)
+          referencePriceAfterSell = currentPrice;
+        } else {
+          // Fallback to avg sell price if no other price available
+          referencePriceAfterSell = avgSellPrice;
+        }
+      } catch (e) {
+        // Fallback to current price or ATH
+        referencePriceAfterSell = ath > currentPrice && ath > 0 ? ath : (currentPrice || avgSellPrice);
+      }
+    } else {
+      referencePriceAfterSell = currentPrice || ath || avgSellPrice;
+    }
+    
+    // Calculate missed gains: max(0, (tokensSold × referencePriceAfterSell) − solReceived)
+    // solReceived = actualProceeds (already in USD)
+    // Note: This assumes SOL price conversion is already done in actualProceeds
+    // For full accuracy, we'd need SOL price at reference timestamp, but we use current SOL price as approximation
     const missedGainsCurrent = totalSold > 0 
-      ? Math.max(0, whatIfCurrentValue - actualProceeds)
+      ? Math.max(0, (totalSold * referencePriceAfterSell) - actualProceeds)
       : 0;
     
     // ROI if held all tokens to current price
@@ -254,8 +298,25 @@ const SolanaAnalyzer = () => {
     // Time held calculation
     let timeHeldDays = 0;
     if (token.firstBuyDate) {
-      const endDate = token.lastSellDate || new Date();
-      timeHeldDays = Math.max(0, differenceInDays(endDate, token.firstBuyDate));
+      try {
+        // Ensure firstBuyDate is a Date object
+        const firstBuy = token.firstBuyDate instanceof Date 
+          ? token.firstBuyDate 
+          : new Date(token.firstBuyDate);
+        
+        // For tokens that were never sold, use current date; otherwise use last sell date
+        const endDate = token.lastSellDate 
+          ? (token.lastSellDate instanceof Date ? token.lastSellDate : new Date(token.lastSellDate))
+          : new Date();
+        
+        // Only calculate if both dates are valid
+        if (!isNaN(firstBuy.getTime()) && !isNaN(endDate.getTime()) && endDate >= firstBuy) {
+          timeHeldDays = Math.max(0, differenceInDays(endDate, firstBuy));
+        }
+      } catch (e) {
+        console.log('Error calculating timeHeldDays for token', token.mint?.slice(0, 8), ':', e);
+        timeHeldDays = 0;
+      }
     }
     
     // Price change percentage
@@ -284,6 +345,7 @@ const SolanaAnalyzer = () => {
       roiIfHeldATH: roundToDecimals(validateNumber(roiIfHeldATH), 2),
       timeHeldDays: Math.max(0, Math.round(timeHeldDays)),
       priceChange: roundToDecimals(validateNumber(priceChange), 2),
+      referencePriceAfterSell: roundToDecimals(validateNumber(referencePriceAfterSell), 6), // Store for warning calculation
     };
   };
 
@@ -314,6 +376,8 @@ const SolanaAnalyzer = () => {
     }
     setLoading(true);
     setError('');
+    setResults(null); // Clear previous results
+    setSelectedToken(null); // Reset selected token when fetching new wallet
     try {
       const heliusResponse = await fetch(`${backendUrl}?endpoint=helius&wallet=${walletAddress}`);
       
@@ -349,7 +413,11 @@ const SolanaAnalyzer = () => {
 
       // Enrich tokens with comprehensive metadata from multiple sources
       const enrichedTokens = await Promise.all(
-        allTokens.map(async (token) => {
+        allTokens.map(async (token, tokenIndex) => {
+          // Add small delay between tokens to avoid rate limiting
+          if (tokenIndex > 0 && tokenIndex % 5 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+          }
           let symbol = token.symbol || '';
           let name = token.name || '';
           let currentPrice = 0;
@@ -392,8 +460,12 @@ const SolanaAnalyzer = () => {
                 }
               }
             }
+            // Suppress 404/400 errors - they're expected for some tokens
           } catch (e) {
-            console.log('DexScreener error for', token.mint, ':', e);
+            // Only log unexpected errors (not 404/400)
+            if (e.message && !e.message.includes('404') && !e.message.includes('400')) {
+              console.log('DexScreener error for', token.mint.slice(0, 8), ':', e.message);
+            }
           }
           
           // Try BirdEye for price data and additional metadata
@@ -425,12 +497,18 @@ const SolanaAnalyzer = () => {
                 if (tokenInfo.decimals) decimals = tokenInfo.decimals;
               }
             }
+            // Suppress 404/400 errors - they're expected for some tokens (e.g., SOL native)
           } catch (e) {
-            console.log('BirdEye error for', token.mint, ':', e);
+            // Only log unexpected errors (not 404/400)
+            if (e.message && !e.message.includes('404') && !e.message.includes('400')) {
+              console.log('BirdEye error for', token.mint.slice(0, 8), ':', e.message);
+          }
           }
           
           // Try CoinGecko for comprehensive metadata (if available)
+          // Add delay to avoid rate limiting (429)
           try {
+            await new Promise(resolve => setTimeout(resolve, 100 * (tokenIndex % 10))); // Stagger requests
             const coingeckoResponse = await fetch(`${backendUrl}?endpoint=coingecko&mint=${token.mint}`);
             if (coingeckoResponse.ok) {
               const coingeckoData = await coingeckoResponse.json();
@@ -456,9 +534,15 @@ const SolanaAnalyzer = () => {
                   }
                 }
               }
+            } else if (coingeckoResponse.status === 429) {
+              // Rate limited - skip silently
             }
+            // Suppress 404/429 errors - they're expected
           } catch (e) {
-            console.log('CoinGecko error for', token.mint, ':', e);
+            // Only log unexpected errors (not 404/429)
+            if (e.message && !e.message.includes('404') && !e.message.includes('429')) {
+              console.log('CoinGecko error for', token.mint.slice(0, 8), ':', e.message);
+            }
           }
           
           // Try Solscan for developer/creator info
@@ -485,8 +569,12 @@ const SolanaAnalyzer = () => {
                   if (tokenInfo.verified !== undefined) verified = tokenInfo.verified;
                 }
               }
+              // Suppress 400/404 errors - they're expected for some tokens
             } catch (e) {
-              console.log('Solscan error for', token.mint, ':', e);
+              // Only log unexpected errors (not 400/404)
+              if (e.message && !e.message.includes('400') && !e.message.includes('404')) {
+                console.log('Solscan error for', token.mint.slice(0, 8), ':', e.message);
+              }
             }
           }
           
@@ -556,8 +644,12 @@ const SolanaAnalyzer = () => {
                   if (tokenInfo.description && !description) description = tokenInfo.description;
                 }
               }
+              // Suppress 404/530 errors - they're expected for non-pump.fun tokens
             } catch (e) {
-              console.log('Pump.fun error for', token.mint, ':', e);
+              // Only log unexpected errors (not 404/530)
+              if (e.message && !e.message.includes('404') && !e.message.includes('530')) {
+                console.log('Pump.fun error for', token.mint.slice(0, 8), ':', e.message);
+              }
             }
           }
           
@@ -692,6 +784,7 @@ const SolanaAnalyzer = () => {
         deposits,
         withdraws,
         transfers,
+        lastUpdated: new Date(),
         summary: {
           totalCost,
           actualProceeds,
@@ -715,6 +808,81 @@ const SolanaAnalyzer = () => {
       cacheService.cacheWalletAnalysis(walletAddress.trim(), resultsData);
 
       setResults(resultsData);
+      
+      // Increment wallet scan count on every successful analysis (via backend API)
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:812',message:'incrementing wallet scan',data:{walletAddress:walletAddress.slice(0,8)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+      // #endregion
+      try {
+        const newScans = await statsService.incrementWalletScan();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:815',message:'wallet scan increment success',data:{newScans,success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        setWalletScanCount(newScans);
+      } catch (e) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:818',message:'wallet scan increment error',data:{error:e.message,success:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+        // #endregion
+        console.error('Error updating wallet scan count:', e);
+        // Try to at least show existing count
+        try {
+          const existing = await statsService.getWalletScans();
+          setWalletScanCount(existing);
+        } catch (e2) {
+          console.error('Error loading existing wallet scan count:', e2);
+        }
+      }
+      
+      // Add to leaderboard (via backend API - saves to JSON file)
+      const existingLeaderboard = await statsService.getLeaderboard();
+      
+      // Calculate the biggest single missed opportunity (biggest miss token)
+      const biggestMissToken = resultsData.summary.biggestMiss || {};
+      const biggestMissValue = biggestMissToken.missedGainsCurrent || 0;
+      
+      // Use total missed gains for ranking (sum of all missed opportunities)
+      const totalMissedGains = resultsData.summary.totalMissedGainsCurrent || 0;
+      
+      // Create comprehensive wallet entry matching the analysis data
+      const walletEntry = {
+        walletAddress: walletAddress.trim(),
+        address: walletAddress.trim(),
+        // Primary ranking value: total missed gains across all tokens
+        paperhandedValue: totalMissedGains,
+        totalMissedGains: totalMissedGains,
+        // Additional metrics for verification and display
+        jitterScore: resultsData.summary.jitterScore || 0,
+        biggestMissValue: biggestMissValue,
+        biggestMissToken: biggestMissToken.symbol || biggestMissToken.mint?.slice(0, 8) || 'Unknown',
+        totalTokens: resultsData.summary.totalTokens || 0,
+        totalCost: resultsData.summary.totalCost || 0,
+        actualProceeds: resultsData.summary.actualProceeds || 0,
+        totalCurrentValue: resultsData.summary.totalCurrentValue || 0,
+        // Timestamp for tracking
+        lastUpdated: new Date().toISOString(),
+      };
+      
+      // Check if wallet already exists in leaderboard
+      const existingIndex = existingLeaderboard.findIndex(w => w.walletAddress === walletAddress.trim());
+      if (existingIndex >= 0) {
+        existingLeaderboard[existingIndex] = walletEntry;
+      } else {
+        existingLeaderboard.push(walletEntry);
+      }
+      
+      // Sort by paperhanded value and keep top 200
+      existingLeaderboard.sort((a, b) => (b.paperhandedValue || 0) - (a.paperhandedValue || 0));
+      const top200 = existingLeaderboard.slice(0, 200);
+      
+      // Save to backend (updates JSON file via GitHub API)
+      try {
+        const updatedLeaderboard = await statsService.updateLeaderboard(top200);
+        setLeaderboardWallets(updatedLeaderboard);
+      } catch (e) {
+        console.error('Error updating leaderboard:', e);
+        // Fallback: use local data
+        setLeaderboardWallets(top200);
+      }
     } catch (err) {
       setError(err.message || 'Error analyzing wallet. Try again.');
       console.error('Error:', err);
@@ -788,20 +956,6 @@ const SolanaAnalyzer = () => {
     return filtered;
   }, [results, activeTab, searchQuery, sortBy, dateFilter]);
 
-  // Get top 3 tokens and rest for dropdown
-  const top3Tokens = useMemo(() => {
-    return filteredAndSortedTokens.slice(0, 3);
-  }, [filteredAndSortedTokens]);
-
-  const restTokens = useMemo(() => {
-    return filteredAndSortedTokens.slice(3);
-  }, [filteredAndSortedTokens]);
-
-  // Get selected token from dropdown
-  const selectedTokenData = useMemo(() => {
-    if (!selectedTokenFromDropdown) return null;
-    return results?.allTokens.find(t => t.mint === selectedTokenFromDropdown);
-  }, [selectedTokenFromDropdown, results]);
 
   // Enhanced image component with multiple fallbacks including pump.fun and launchpads
   const TokenImage = React.memo(({ token, size = 'w-20 h-20', className = '' }) => {
@@ -812,25 +966,31 @@ const SolanaAnalyzer = () => {
     });
     const [errorCount, setErrorCount] = useState(0);
     
-    // Comprehensive fallback sources including pump.fun and other launchpads
+    // Comprehensive fallback sources prioritizing launch platforms
     const getFallbackSources = useCallback(() => {
       const symbol = token.symbol || token.mint.slice(0, 4);
       return [
         token.logoURI, // From API metadata (CoinGecko, DexScreener, etc.)
-        // Pump.fun sources (priority for memecoins)
+        // Launch platforms (HIGHEST PRIORITY for memecoins)
         `https://pump.fun/${token.mint}.png`,
         `https://pump.monster/api/token/${token.mint}/image`,
         `https://pump.fun/api/token/${token.mint}/image`,
-        // Official Solana token list
-        `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`,
-        `https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/assets/mainnet/${token.mint}/logo.png`,
-        // DEX and aggregator CDNs
+        `https://api.pump.fun/tokens/${token.mint}/logo`,
+        // Moonshot launchpad
+        `https://api.moonshot.fun/token/${token.mint}/image`,
+        `https://moonshot.fun/token/${token.mint}/logo.png`,
+        // Other launchpads
+        `https://api.step.finance/token/${token.mint}/logo`,
+        `https://api.raydium.io/token/${token.mint}/logo`,
+        // DEX and aggregator CDNs (high priority)
         `https://img.raydium.io/${token.mint}`,
         `https://static.jup.ag/tokens/${token.mint}.png`,
         `https://assets.jup.ag/tokens/${token.mint}.png`,
+        // Official Solana token list
+        `https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/${token.mint}/logo.png`,
+        `https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/assets/mainnet/${token.mint}/logo.png`,
         // CoinGecko
         `https://assets.coingecko.com/coins/images/solana/${token.mint}/large.png`,
-        // DexScreener (via API response, not direct image URL)
         // Arweave (common for Solana NFTs and tokens)
         `https://arweave.net/${token.mint}`,
         `https://arweave.net/${token.mint}/logo.png`,
@@ -838,9 +998,6 @@ const SolanaAnalyzer = () => {
         `https://ipfs.io/ipfs/${token.mint}`,
         `https://gateway.pinata.cloud/ipfs/${token.mint}`,
         `https://cloudflare-ipfs.com/ipfs/${token.mint}`,
-        // Other launchpad sources
-        `https://api.moonshot.fun/token/${token.mint}/image`, // Moonshot launchpad
-        `https://api.step.finance/token/${token.mint}/logo`, // Step Finance
         // Generated avatar (last resort)
         `https://ui-avatars.com/api/?name=${encodeURIComponent(symbol)}&background=22c55e&color=fff&size=128&bold=true`,
       ].filter(Boolean); // Remove null/undefined values
@@ -853,7 +1010,9 @@ const SolanaAnalyzer = () => {
       setErrorCount(0);
     }, [token.mint, token.logoURI, token.symbol, getFallbackSources]);
     
-    const handleError = () => {
+    const handleError = (e) => {
+      // Suppress CORS errors in console - they're expected and handled by fallback
+      e.stopPropagation();
       const sources = getFallbackSources();
       if (errorCount < sources.length - 1) {
         const nextIndex = errorCount + 1;
@@ -869,7 +1028,6 @@ const SolanaAnalyzer = () => {
         className={`${size} rounded-lg object-cover bg-[#404040] ${className}`}
         onError={handleError}
         loading="lazy"
-        crossOrigin="anonymous"
       />
     );
   });
@@ -877,546 +1035,388 @@ const SolanaAnalyzer = () => {
   TokenImage.displayName = 'TokenImage';
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'paperhand', label: 'Paperhand' },
-    { id: 'roundtrip', label: 'Roundtrip' },
-    { id: 'gained', label: 'Gained' },
+    { id: 'paperhand', label: 'JitterHands', description: 'Tokens sold too early - missed gains' },
+    { id: 'roundtrip', label: 'RoundTrip', description: 'Partially sold tokens - roundtrip analysis' },
+    { id: 'gained', label: 'Gained', description: 'Currently held tokens - profit/loss tracking' },
   ];
 
-  // Render token card component
-  const renderTokenCard = (token, index, showRank = true) => {
-    const isExpanded = expandedTokens.has(token.mint);
-    const rankColor = index === 0 ? 'bg-green-500' : index === 1 ? 'bg-yellow-500' : 'bg-gray-600';
+
+  const handleTokenClick = useCallback((token) => {
+    // Find the full token object from allTokens to ensure we have all data
+    const fullToken = results?.allTokens?.find(t => t.mint === token.mint) || token;
+    setSelectedToken(fullToken);
+    
+    // Automatically switch to the correct tab based on token status
+    if (fullToken.status === 'sold') {
+      setActiveTab('paperhand');
+    } else if (fullToken.status === 'partial') {
+      setActiveTab('roundtrip');
+    } else if (fullToken.status === 'held' || fullToken.status === 'never_sold') {
+      setActiveTab('gained');
+    }
+    
+    // Scroll to top when clicked
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [results?.allTokens]);
+
+  // Render horizontal token card matching paperhands.gm.ai style
+  const renderHorizontalTokenCard = (token, index) => {
+    const rankColor = index === 0 ? 'bg-green-500' : index === 1 ? 'bg-yellow-500' : index === 2 ? 'bg-orange-500' : 'bg-gray-600';
+    const isSelected = selectedToken?.mint === token.mint || (!selectedToken && index === 0);
+    
+    // Calculate display value based on active tab
+    let displayValue, displayLabel, solAmount;
+    const solPrice = 150;
+    
+    let isGain = false;
+    let isLoss = false;
+    
+    if (activeTab === 'paperhand') {
+      // JitterHands: Show missed gains (always a loss)
+      displayValue = token.missedGainsCurrent || 0;
+      displayLabel = `(${(token.roiIfHeldCurrent || 0).toFixed(2)}%)`;
+      solAmount = (token.missedGainsCurrent || 0) / solPrice;
+      isLoss = true;
+    } else if (activeTab === 'roundtrip') {
+      // RoundTrip: Show roundtripped value
+      displayValue = token.actualProceeds || 0;
+      const roundtripResult = displayValue - (token.totalCost || 0);
+      displayLabel = `(${(token.roi || 0).toFixed(2)}%)`;
+      solAmount = (token.actualProceeds || 0) / solPrice;
+      if (roundtripResult > 0) {
+        isGain = true;
+      } else if (roundtripResult < 0) {
+        isLoss = true;
+      }
+    } else {
+      // Gained: Show current value/gains
+      displayValue = token.currentValue || 0;
+      const gains = (token.currentValue || 0) - (token.totalCost || 0);
+      displayLabel = gains >= 0 ? `(+${((gains / (token.totalCost || 1)) * 100).toFixed(2)}%)` : `(${((gains / (token.totalCost || 1)) * 100).toFixed(2)}%)`;
+      solAmount = (token.currentValue || 0) / solPrice;
+      if (gains > 0) {
+        isGain = true;
+      } else if (gains < 0) {
+        isLoss = true;
+      }
+    }
+    
+    const formatValue = (val) => {
+      if (val >= 1000000) {
+        const millions = val / 1000000;
+        return `$${millions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
+      }
+      if (val >= 1000) {
+        const thousands = val / 1000;
+        return `$${thousands.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}K`;
+      }
+      return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
+
+  // Determine border and background colors based on gain/loss (matching LiveTicker)
+  let borderColor, bgColor, hoverBorderColor;
+  if (isGain) {
+    borderColor = 'border-green-500';
+    bgColor = 'bg-[#1a2e1a]'; // Subtle green tint
+    hoverBorderColor = 'hover:border-green-400';
+  } else if (isLoss) {
+    borderColor = 'border-red-500';
+    bgColor = 'bg-[#2e1a1a]'; // Subtle red tint
+    hoverBorderColor = 'hover:border-red-400';
+  } else {
+    borderColor = 'border-[#404040]';
+    bgColor = 'bg-[#2a2a2a]';
+    hoverBorderColor = 'hover:border-[#606060]';
+  }
+  
+  // Override with green if selected (for visual feedback)
+  if (isSelected) {
+    borderColor = 'border-green-500';
+    bgColor = 'bg-green-500/10';
+    hoverBorderColor = 'hover:border-green-400';
+  }
 
   return (
-      <GlassCard
+      <div
         key={token.mint}
         data-token-mint={token.mint}
-        className="w-full md:w-80 flex-shrink-0 p-6"
+        className={`flex-shrink-0 w-64 sm:w-72 p-3 sm:p-4 rounded-lg border-2 ${borderColor} ${bgColor} ${hoverBorderColor} transition-all cursor-pointer`}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleTokenClick(token);
+        }}
       >
-        {showRank && (
-          <div className="flex justify-between items-start mb-4">
-            <div className={`w-8 h-8 ${rankColor} rounded-full flex items-center justify-center text-white font-bold text-sm`}>
-              {index + 1}
+        {/* Rank Badge */}
+        <div className="flex items-start justify-between mb-3">
+          <div className={`w-6 h-6 ${rankColor} rounded-full flex items-center justify-center text-white font-bold text-xs`}>
+            {index + 1}
         </div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                addToWatchlistUtil(token);
-                // Force re-render to update star state
-                setShowWatchlist(prev => !prev);
-                setShowWatchlist(prev => !prev);
-              }}
-              className={`p-1.5 rounded transition-all ${
-                isInWatchlist(token.mint)
-                  ? 'text-yellow-400 bg-yellow-400/20'
-                  : 'text-gray-400 hover:text-yellow-400 hover:bg-yellow-400/10'
-              }`}
-              title={isInWatchlist(token.mint) ? 'Remove from watchlist' : 'Add to watchlist'}
-            >
-              <Star size={16} fill={isInWatchlist(token.mint) ? 'currentColor' : 'none'} />
-            </button>
       </div>
-        )}
-        
-        <div className="flex items-center gap-4 mb-4">
-          <div className="relative flex-shrink-0">
-            <TokenImage token={token} size="w-20 h-20" />
-            {token.currentPrice > 0 && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-[#2a2a2a] animate-pulse" />
-            )}
-            {token.verified && (
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-[#2a2a2a] flex items-center justify-center">
-                <span className="text-white text-xs">✓</span>
-              </div>
-            )}
+
+        {/* Token Image and Info */}
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-shrink-0">
+            <TokenImage token={token} size="w-12 h-12" className="rounded-full" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-2xl font-bold text-white truncate">{token.symbol || 'Unknown'}</h3>
-              {token.currentPrice > 0 && (
-                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded flex-shrink-0">
-                  LIVE
-                </span>
-              )}
-              {token.isWrapped && (
-                <span className="text-xs px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded flex-shrink-0">
-                  Wrapped
-                </span>
-              )}
-              {token.verified && (
-                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded flex-shrink-0">
-                  ✓ Verified
-                </span>
+            <div className="flex items-center gap-2">
+              <h3 className={`text-lg font-bold truncate ${
+                isGain ? 'text-green-300' : isLoss ? 'text-red-300' : 'text-white'
+              }`}>{token.symbol || 'Unknown'}</h3>
+              {index < 3 && (
+                <div className={`w-5 h-5 ${rankColor} rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
+                  {index + 1}
+                </div>
               )}
             </div>
-            <p className="text-gray-400 text-sm truncate" title={token.name}>{token.name || 'Unknown Token'}</p>
-            {token.platform && token.platform !== 'Solana' && (
-              <p className="text-gray-500 text-xs mt-0.5">Platform: {token.platform}</p>
-            )}
-            {/* Always show contract address in compact form */}
-            <p className="text-gray-500 text-xs mt-1 font-mono truncate" title={token.mint}>
-              CA: {token.mint.slice(0, 8)}...{token.mint.slice(-6)}
-            </p>
+            <p className={`text-xs truncate ${
+              isGain ? 'text-green-400/70' : isLoss ? 'text-red-400/70' : 'text-gray-400'
+            }`} title={token.name}>{token.name || 'Unknown Token'}</p>
           </div>
         </div>
         
-        <div className="mb-3">
-          <div className="flex items-baseline gap-2">
-            <p className="text-green-500 text-3xl font-bold">
-              ${Math.round(token.missedGainsCurrent || token.whatIfCurrentValue || 0).toLocaleString()}
-            </p>
-            {token.currentPrice > 0 && token.avgBuyPrice > 0 && (
-              <span className={`text-xs font-medium ${
-                token.currentPrice >= token.avgBuyPrice ? 'text-green-400' : 'text-red-400'
-              }`}>
-                {token.currentPrice >= token.avgBuyPrice ? '↑' : '↓'}
-              </span>
-            )}
-          </div>
-          <p className="text-gray-500 text-sm mt-1">
-            ({((token.roiIfHeldCurrent || 0).toFixed(2))}%)
+        {/* Value and Percentage */}
+        <div className="mb-2">
+          <p className={`text-sm mb-1 ${
+            isGain ? 'text-green-300' : isLoss ? 'text-red-300' : 'text-white'
+          }`}>
+            {solAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} SOL
+            <span className={`text-xs ml-2 ${
+              isGain ? 'text-green-400/70' : isLoss ? 'text-red-400/70' : 'text-gray-500'
+            }`}>• Amount in Solana</span>
           </p>
-          {token.buyPrices && token.buyPrices.length > 1 && (
-            <div className="mt-2 h-8">
-              <Sparkline 
-                data={token.buyPrices.concat(token.currentPrice || token.avgBuyPrice)} 
-                positive={token.currentPrice >= token.avgBuyPrice}
-              />
-            </div>
-          )}
+          <p className={`${isGain ? 'text-green-400' : isLoss ? 'text-red-400' : 'text-white'} text-2xl font-bold`}>
+            {formatValue(displayValue)}
+            <span className={`text-xs ml-2 font-normal ${
+              isGain ? 'text-green-400/70' : isLoss ? 'text-red-400/70' : 'text-gray-500'
+            }`}>
+              {activeTab === 'paperhand' 
+                ? '• Missed gains'
+                : activeTab === 'roundtrip'
+                ? '• Roundtripped value'
+                : '• Current value'}
+            </span>
+          </p>
+          <p className={`${isGain ? 'text-green-400' : isLoss ? 'text-red-400' : 'text-white'} text-sm`}>
+            {displayLabel}
+            <span className={`text-xs ml-2 ${
+              isGain ? 'text-green-400/70' : isLoss ? 'text-red-400/70' : 'text-gray-500'
+            }`}>
+              {isGain ? '• Profit' : isLoss ? '• Loss' : '• Breakeven'}
+            </span>
+          </p>
         </div>
-
-        <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-          <div>
-            <p className="text-gray-500">Actual ROI</p>
-            <p className={`font-semibold ${(token.roi || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {(token.roi || 0).toFixed(2)}%
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500">Current Value</p>
-            <p className="text-white font-semibold">
-              ${Math.round(token.currentValue || 0).toLocaleString()}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500">If Held (ATH)</p>
-            <p className="text-green-400 font-semibold">
-              ${Math.round(token.whatIfATHValue || 0).toLocaleString()}
-            </p>
-          </div>
-          <div>
-            <p className="text-gray-500">Held For</p>
-            <p className="text-white font-semibold">
-              {token.timeHeldDays || 0} days
-            </p>
-          </div>
-        </div>
-        
-        <button
-          onClick={() => toggleTokenExpand(token.mint)}
-          className="w-full flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm mb-3"
-        >
-          {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          {isExpanded ? 'Show Less' : 'Show Details'}
-        </button>
-
-        {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-[#404040] space-y-3 text-xs">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <p className="text-gray-500">Avg Buy Price</p>
-                <p className="text-white font-semibold">${(token.avgBuyPrice || 0).toFixed(6)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Current Price</p>
-                <p className="text-white font-semibold">${(token.currentPrice || 0).toFixed(6)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">ATH</p>
-                <p className="text-white font-semibold">${(token.ath || 0).toFixed(6)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Price Change</p>
-                <p className={`font-semibold ${(token.priceChange || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                  {(token.priceChange || 0).toFixed(2)}%
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-500">Total Bought</p>
-                <p className="text-white font-semibold">{(token.totalBought || 0).toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Total Sold</p>
-                <p className="text-white font-semibold">{(token.totalSold || 0).toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Currently Held</p>
-                <p className="text-white font-semibold">{(token.currentHeld || 0).toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500">Actual Proceeds</p>
-                <p className="text-white font-semibold">
-                  ${Math.round(token.actualProceeds || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-            
-            {/* Token Metadata Section */}
-            <div className="pt-2 border-t border-[#404040]">
-              <p className="text-gray-500 mb-2 font-semibold">Token Information</p>
-              <div className="space-y-1.5 text-gray-400">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-500 w-24">Platform:</span>
-                  <span className="text-white">{token.platform || 'Solana'}</span>
-                  {token.isWrapped && (
-                    <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Wrapped</span>
-                  )}
-                  {token.verified && (
-                    <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded">✓ Verified</span>
-                  )}
-                </div>
-                {token.developerWallet && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-gray-500 w-24">Developer:</span>
-                    <a 
-                      href={`https://solscan.io/account/${token.developerWallet}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-400 hover:text-green-300 font-mono text-xs break-all"
-                    >
-                      {token.developerWallet.slice(0, 8)}...{token.developerWallet.slice(-6)}
-                    </a>
-                  </div>
-                )}
-                {token.creatorWallet && token.creatorWallet !== token.developerWallet && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-gray-500 w-24">Creator:</span>
-                    <a 
-                      href={`https://solscan.io/account/${token.creatorWallet}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-green-400 hover:text-green-300 font-mono text-xs break-all"
-                    >
-                      {token.creatorWallet.slice(0, 8)}...{token.creatorWallet.slice(-6)}
-                    </a>
-                  </div>
-                )}
-                {token.wrappedTokenAddress && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-gray-500 w-24">Wrapped From:</span>
-                    <span className="text-white font-mono text-xs break-all">{token.wrappedTokenAddress}</span>
-                  </div>
-                )}
-                {token.marketCap > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 w-24">Market Cap:</span>
-                    <span className="text-white">${(token.marketCap / 1000000).toFixed(2)}M</span>
-                  </div>
-                )}
-                {token.volume24h > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 w-24">24h Volume:</span>
-                    <span className="text-white">${(token.volume24h / 1000).toFixed(2)}K</span>
-                  </div>
-                )}
-                {token.liquidity > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 w-24">Liquidity:</span>
-                    <span className="text-white">${(token.liquidity / 1000).toFixed(2)}K</span>
-                  </div>
-                )}
-                {token.description && (
-                  <div className="flex items-start gap-2">
-                    <span className="text-gray-500 w-24">Description:</span>
-                    <span className="text-white text-xs">{token.description.substring(0, 100)}{token.description.length > 100 ? '...' : ''}</span>
-                  </div>
-                )}
-              </div>
-              
-              {/* Social Links */}
-              {(token.website || token.twitter || token.telegram) && (
-                <div className="mt-2 pt-2 border-t border-[#404040]">
-                  <p className="text-gray-500 mb-1.5 text-xs">Links:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {token.website && (
-                      <a 
-                        href={token.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-green-400 hover:text-green-300 text-xs"
-                      >
-                        🌐 Website
-                      </a>
-                    )}
-                    {token.twitter && (
-                      <a 
-                        href={token.twitter}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-green-400 hover:text-green-300 text-xs"
-                      >
-                        🐦 Twitter
-                      </a>
-                    )}
-                    {token.telegram && (
-                      <a 
-                        href={token.telegram}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-green-400 hover:text-green-300 text-xs"
-                      >
-                        💬 Telegram
-                      </a>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {token.firstBuyDate && (
-              <div className="pt-2 border-t border-[#404040]">
-                <p className="text-gray-500 mb-1">Transaction Dates</p>
-                <div className="space-y-0.5 text-gray-400">
-                  {token.firstBuyDate && (
-                    <p>First Buy: {format(token.firstBuyDate, 'MMM dd, yyyy')}</p>
-                  )}
-                  {token.lastBuyDate && (
-                    <p>Last Buy: {format(token.lastBuyDate, 'MMM dd, yyyy')}</p>
-                  )}
-                  {token.firstSellDate && (
-                    <p>First Sell: {format(token.firstSellDate, 'MMM dd, yyyy')}</p>
-                  )}
-                  {token.lastSellDate && (
-                    <p>Last Sell: {format(token.lastSellDate, 'MMM dd, yyyy')}</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        <div className="pt-3 border-t border-[#404040] text-xs">
-          <div className="flex items-start justify-between gap-2 mb-2">
-            <div className="flex-1 min-w-0">
-              <p className="text-gray-500 mb-1">Contract Address (CA):</p>
-              <p className="text-gray-300 font-mono break-all text-xs" title={token.mint}>
-                {token.mint}
-              </p>
-            </div>
-            <div className="flex-shrink-0">
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(token.mint);
-                  alert('Contract address copied to clipboard!');
-                }}
-                className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
-                title="Copy contract address"
-              >
-                Copy
-              </button>
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2 mt-2">
-            <a 
-              href={`https://solscan.io/token/${token.mint}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
-            >
-              View on Solscan →
-            </a>
-            <a 
-              href={`https://dexscreener.com/solana/${token.mint}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
-            >
-              DexScreener →
-            </a>
-            <a 
-              href={`https://birdeye.so/token/${token.mint}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-green-400 hover:text-green-300 text-xs px-2 py-1 border border-green-400/30 rounded hover:bg-green-400/10 transition"
-            >
-              BirdEye →
-            </a>
-          </div>
-        </div>
-      </GlassCard>
+      </div>
     );
   };
 
-  const handleTokenClick = (token) => {
-    setSelectedTokenFromDropdown(token.mint);
-    setActiveTab('dashboard');
-    // Scroll to token card
-    setTimeout(() => {
-      const element = document.querySelector(`[data-token-mint="${token.mint}"]`);
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }, 100);
-  };
-
-  // Fetch donation wallet balance for header
+  // Load shareable link on mount, load leaderboard, and track visits
   useEffect(() => {
-    const fetchDonationBalance = async () => {
-      setDonationLoading(true);
+    const urlParams = new URLSearchParams(window.location.search);
+    const shareParam = urlParams.get('share');
+    if (shareParam) {
       try {
-        // Fetch SOL price
-        let solPrice = 150;
-        try {
-          const priceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
-          const priceData = await priceResponse.json();
-          if (priceData.solana?.usd) {
-            solPrice = priceData.solana.usd;
-          }
-        } catch (e) {
-          console.log('Error fetching SOL price:', e);
+        const decoded = JSON.parse(atob(shareParam));
+        if (decoded.wallet) {
+          setWalletAddress(decoded.wallet);
+          // Auto-fetch if wallet is in share link
+          setTimeout(() => {
+            fetchWalletData();
+          }, 500);
         }
-
-        // Fetch balance from Solana RPC
-        let lamports = 0;
-        const rpcEndpoints = [
-          'https://api.mainnet-beta.solana.com',
-          'https://solana-api.projectserum.com',
-          'https://rpc.ankr.com/solana',
-        ];
-
-        for (const endpoint of rpcEndpoints) {
-          try {
-            const balanceResponse = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: 1,
-                method: 'getBalance',
-                params: [DONATION_WALLET],
-              }),
-            });
-            const balanceData = await balanceResponse.json();
-            if (balanceData.result?.value) {
-              lamports = balanceData.result.value;
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        const sol = lamports / 1e9;
-        const usd = sol * solPrice;
-        setDonationBalance({ sol, usd });
       } catch (e) {
-        console.log('Error fetching donation balance:', e);
-      } finally {
-        setDonationLoading(false);
+        console.log('Invalid share link:', e);
+      }
+    }
+    
+    // Load all stats from backend API (JSON file) - shared globally
+    const loadStats = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:1235',message:'loadStats called',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
+      try {
+        // Load all stats at once
+        const stats = await statsService.getAllStats();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:1239',message:'loadStats result',data:{visits:stats.visits,walletScans:stats.walletScans,leaderboardLength:stats.leaderboard?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
+        setVisitCount(stats.visits || 0);
+        setWalletScanCount(stats.walletScans || 0);
+        setLeaderboardWallets(stats.leaderboard || []);
+      } catch (e) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:1244',message:'loadStats error',data:{error:e.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
+        console.error('Error loading stats:', e);
+        // Fallback to defaults
+        setVisitCount(0);
+        setWalletScanCount(0);
+        setLeaderboardWallets([]);
       }
     };
-
-    fetchDonationBalance();
-    const interval = setInterval(fetchDonationBalance, 30000); // Update every 30 seconds
-    return () => clearInterval(interval);
+    
+    // Load initial stats
+    loadStats();
+    
+    // Track visits (increment on every page load via backend API)
+    const trackVisit = async () => {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:1254',message:'trackVisit called',data:{timestamp:Date.now()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      try {
+        const newVisits = await statsService.incrementVisit();
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:1257',message:'visit increment success',data:{newVisits,success:true},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
+        setVisitCount(newVisits);
+      } catch (e) {
+        // #region agent log
+        fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:1260',message:'visit increment error',data:{error:e.message,success:false},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+        // #endregion
+        console.error('Error tracking visits:', e);
+        // Try to at least show existing count
+        try {
+          const existing = await statsService.getVisits();
+          setVisitCount(existing);
+        } catch (e2) {
+          setVisitCount(0);
+        }
+      }
+    };
+    
+    // Increment visit count (saves to JSON file via backend)
+    trackVisit();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const copyDonationAddress = () => {
-    navigator.clipboard.writeText(DONATION_WALLET);
-    setDonationCopied(true);
-    setTimeout(() => setDonationCopied(false), 2000);
-  };
 
   return (
     <div className="min-h-screen animate-fade-in bg-[#1a1a1a]">
-      {/* Merged Header with Donation Support */}
-      <div className="bg-gradient-to-r from-green-500/10 via-green-600/10 to-green-500/10 border-b border-green-500/30 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
+      {/* Simplified Header matching paperhands.gm.ai */}
+      <div className="bg-[#1a1a1a] border-b border-[#404040] sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
             {/* Left: Logo and Branding */}
-            <div className="flex items-center gap-3">
-              <span className="text-white text-2xl font-bold">JH</span>
-              <span className="text-white text-xl">JitterHands.fun</span>
-              <span className="text-gray-500 text-sm ml-2">BETA</span>
+            <div className="flex items-center gap-2 sm:gap-3">
+              <span className="text-white text-xl sm:text-2xl font-bold">JH</span>
+              <span className="text-white text-lg sm:text-xl">JitterHands.fun</span>
+              <span className="text-gray-500 text-xs sm:text-sm ml-1 sm:ml-2">BETA</span>
             </div>
 
-            {/* Center: Donation Info */}
-            <div className="flex-1 flex items-center justify-center gap-4 text-sm">
-              <div className="flex items-center gap-3">
-                <Heart size={16} className="text-green-400 animate-pulse" fill="currentColor" />
-                <span className="text-white font-semibold">Support JitterHands.fun</span>
-                <span className="text-gray-400">•</span>
-                <span className="text-gray-300">
-                  {donationLoading 
-                    ? 'Loading...' 
-                    : `${donationBalance.sol.toFixed(4)} SOL ($${donationBalance.usd.toFixed(2)})`
-                  }
-                </span>
-              </div>
+            {/* Right: Navigation Buttons */}
+            <div className="flex items-center gap-2 sm:gap-3">
               <button
-                onClick={copyDonationAddress}
-                className="flex items-center gap-2 px-3 py-1 bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 rounded-lg transition text-green-400 text-xs flex-shrink-0"
+                onClick={() => {
+                  setShowLeaderboard(true);
+                  setWalletAddress('');
+                  setResults(null);
+                }}
+                className={`px-3 sm:px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all font-mono text-sm sm:text-base ${
+                  showLeaderboard
+                    ? 'bg-[#2a2a2a] border border-[#404040] text-green-500'
+                    : 'bg-[#2a2a2a] hover:bg-[#404040] border border-[#404040] text-gray-300 hover:text-white'
+                }`}
               >
-                {donationCopied ? <Check size={14} /> : <Copy size={14} />}
-                {donationCopied ? 'Copied!' : 'Copy Address'}
+                <BarChart3 size={16} className={showLeaderboard ? 'text-green-500' : 'text-gray-300'} />
+                <span className="hidden sm:inline">Leaderboard</span>
+                <span className="sm:hidden">Board</span>
               </button>
             </div>
-
-            {/* Right: Search Button */}
-            <button
-              onClick={fetchWalletData}
-              disabled={loading}
-              className="bg-green-500/20 hover:bg-green-500/30 border border-green-500/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 flex-shrink-0"
-            >
-              <Search size={18} />
-              {loading ? 'Analyzing...' : 'Search'}
-            </button>
           </div>
         </div>
       </div>
 
       {/* Live Ticker */}
-      {results && results.allTokens && results.allTokens.length > 0 && (
+      {!showLeaderboard && results && results.allTokens && results.allTokens.length > 0 && (
         <LiveTicker tokens={results.allTokens} onTokenClick={handleTokenClick} />
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+        {/* Leaderboard View */}
+        {showLeaderboard && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-green-500 sm:w-6 sm:h-6">
+                  <path d="M3 3v18h18" />
+                  <path d="M7 12h4M7 8h8M7 16h2" />
+                </svg>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">Top Giga Jeeters</h1>
+              </div>
+              <button
+                onClick={() => {
+                  setShowLeaderboard(false);
+                  setWalletAddress('');
+                  setResults(null);
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-[#2a2a2a] hover:bg-[#404040] border border-[#404040] text-white rounded-lg flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
+              >
+                <ArrowLeft size={18} />
+                Back to Search
+              </button>
+            </div>
+            <Leaderboard wallets={leaderboardWallets} />
+          </div>
+        )}
+
+        {/* Stats Counter - Subtle display in header area */}
+        {!showLeaderboard && (
+          <div className="flex items-center justify-center gap-4 sm:gap-6 mb-4 text-gray-500 text-xs">
+            <div className="flex items-center gap-1.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                <path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z" />
+                <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span className="text-gray-400">{visitCount.toLocaleString()}</span>
+              <span className="text-gray-600">visits</span>
+            </div>
+            <div className="w-px h-3 bg-[#404040]"></div>
+            <div className="flex items-center gap-1.5">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-gray-500">
+                <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+                <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+              </svg>
+              <span className="text-gray-400">{walletScanCount.toLocaleString()}</span>
+              <span className="text-gray-600">wallets scanned</span>
+            </div>
+          </div>
+        )}
+
         {/* Search Input */}
-        {!results && (
-          <GlassCard className="p-6 mb-6">
-            <div className="flex flex-col items-center mb-6">
+        {!showLeaderboard && !results && (
+          <GlassCard className="p-4 sm:p-6 mb-6">
+            <div className="flex flex-col items-center mb-4 sm:mb-6">
               <img 
                 src="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png" 
                 alt="Solana" 
-                className="w-24 h-24 mb-4"
+                className="w-16 h-16 sm:w-24 sm:h-24 mb-3 sm:mb-4"
                 onError={(e) => {
                   e.target.src = 'https://cryptologos.cc/logos/solana-sol-logo.png';
                 }}
               />
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome to JitterHands.fun</h2>
-              <p className="text-gray-400 text-sm">Analyze your Solana wallet trading history</p>
+              <h2 className="text-xl sm:text-2xl font-bold text-white mb-2 text-center">Welcome to JitterHands.fun</h2>
+              <p className="text-gray-400 text-xs sm:text-sm text-center">Analyze your Solana wallet trading history</p>
             </div>
-            <label className="block text-sm font-semibold text-gray-300 mb-3">Solana Wallet Address</label>
-            <div className="flex gap-4">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-300 mb-3">Solana Wallet Address</label>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={20} />
+                <Search className="absolute left-3 sm:left-4 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
             <input
               type="text"
               value={walletAddress}
               onChange={(e) => setWalletAddress(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && fetchWalletData()}
-              placeholder="Enter your Solana wallet address..."
-                  className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all"
+              placeholder="Enter wallet address..."
+                  className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg pl-10 sm:pl-12 pr-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all text-base"
             />
               </div>
             <button
               onClick={fetchWalletData}
               disabled={loading}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold px-8 py-3 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white font-semibold px-6 sm:px-8 py-3 rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Search size={20} />
+              <Search size={18} />
               {loading ? 'Analyzing...' : 'Analyze'}
             </button>
           </div>
@@ -1424,15 +1424,15 @@ const SolanaAnalyzer = () => {
               <div className="mt-4 p-4 bg-red-500/20 border border-red-500/30 rounded-lg">
                 <p className="text-red-300 text-sm font-medium">{error}</p>
         </div>
-            )}
+              )}
             <p className="text-gray-500 text-xs mt-3">Data sourced from Helius and BirdEye. Processing may take 10-30 seconds.</p>
           </GlassCard>
         )}
 
         {/* Search bar when results are shown */}
-        {results && (
-          <div className="mb-6">
-            <div className="flex gap-4 items-center">
+        {!showLeaderboard && results && (
+          <div className="mb-4 sm:mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" size={18} />
                 <input
@@ -1441,503 +1441,648 @@ const SolanaAnalyzer = () => {
                   onChange={(e) => setWalletAddress(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && fetchWalletData()}
                   placeholder="Enter wallet address..."
-                  className="w-full bg-[#2a2a2a] border border-[#404040] rounded-lg pl-10 pr-4 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all text-sm"
+                  className="w-full bg-[#2a2a2a] border border-[#404040] rounded-lg pl-10 pr-4 py-2.5 sm:py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all text-base sm:text-sm"
                 />
                 </div>
               <button
                 onClick={fetchWalletData}
                 disabled={loading}
-                className="bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all disabled:opacity-50 text-sm"
+                className="w-full sm:w-auto bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white px-4 py-2.5 sm:py-2 rounded-lg flex items-center justify-center gap-2 transition-all disabled:opacity-50 text-sm"
               >
                 <Search size={18} />
                 {loading ? 'Analyzing...' : 'Search'}
               </button>
               </div>
-          </div>
+                </div>
         )}
 
-        {results && (
+        {!showLeaderboard && results && (
           <div className="space-y-6 animate-fade-in">
-            {/* Navigation Tabs */}
-            <div className="flex gap-4 border-b border-[#404040]">
-              {tabs.map(tab => (
+            {/* Jitter Score Display */}
+            {results.summary?.jitterScore !== undefined && (
+              <GlassCard className="p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div className="flex-1 w-full">
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2">
+                      <h3 className="text-white font-semibold text-base sm:text-lg">Jitter Score</h3>
+                      <span 
+                        className="text-gray-400 text-xs cursor-help"
+                        title="A composite score (0-100) measuring how 'jittery' or 'paperhanded' your wallet is. Higher scores indicate more early sells, missed gains, and shorter hold times. Calculated from: Paperhand ratio (40%) + Missed gains ratio (40%) + Hold time (20%)."
+                      >
+                        ⓘ
+                      </span>
+                </div>
+                    <p className="text-gray-500 text-xs mb-3">
+                      Measures your tendency to sell early and miss potential gains. Higher = more jittery.
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                      <div className="flex-1 w-full">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className={`text-2xl sm:text-3xl font-bold ${
+                            results.summary.jitterScore >= 70 ? 'text-red-500' :
+                            results.summary.jitterScore >= 40 ? 'text-yellow-500' :
+                            'text-green-500'
+                          }`}>
+                            {results.summary.jitterScore}
+                          </span>
+                          <span className="text-gray-500 text-xs sm:text-sm">/ 100</span>
+              </div>
+                        <div className="w-full bg-[#1a1a1a] rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-full transition-all ${
+                              results.summary.jitterScore >= 70 ? 'bg-red-500' :
+                              results.summary.jitterScore >= 40 ? 'bg-yellow-500' :
+                              'bg-green-500'
+                            }`}
+                            style={{ width: `${results.summary.jitterScore}%` }}
+                          />
+            </div>
+                      </div>
+                      <div className="text-left sm:text-right w-full sm:w-auto">
+                        <p className="text-gray-400 text-xs mb-1">Interpretation</p>
+                        <p className={`text-sm font-semibold ${
+                          results.summary.jitterScore >= 70 ? 'text-red-400' :
+                          results.summary.jitterScore >= 40 ? 'text-yellow-400' :
+                          'text-green-400'
+                        }`}>
+                          {results.summary.jitterScore >= 70 ? 'Giga Jeeter' :
+                           results.summary.jitterScore >= 40 ? 'Jittery' :
+                           'Diamond Hands'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+            )}
+
+            {/* Navigation Tabs - Simplified matching paperhands.gm.ai */}
+            <div className="space-y-2">
+              <div className="flex gap-2 sm:gap-4 border-b border-[#404040] overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0">
+                {tabs.map(tab => (
                   <button 
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                    activeTab === tab.id
-                      ? 'text-green-500 border-green-500'
-                      : 'text-gray-400 border-transparent hover:text-gray-300'
-                  }`}
-                >
-                  {tab.label}
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setSelectedToken(null); // Reset selection when changing tabs
+                    }}
+                    className={`flex-shrink-0 px-4 sm:px-6 py-3 font-semibold text-xs sm:text-sm transition-all whitespace-nowrap ${
+                      activeTab === tab.id
+                        ? 'text-white bg-[#2a2a2a] border-b-2 border-green-500'
+                        : 'text-gray-400 hover:text-gray-300'
+                    }`}
+                    >
+                    {tab.label}
                   </button>
                 ))}
-              <button
-                onClick={() => {
-                  setShowWatchlist(!showWatchlist);
-                  setShowComparison(false);
-                }}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  showWatchlist
-                    ? 'text-yellow-400 border-yellow-400'
-                    : 'text-gray-400 border-transparent hover:text-yellow-300'
-                }`}
-              >
-                <Star size={16} className="inline mr-2" fill={showWatchlist ? 'currentColor' : 'none'} />
-                Watchlist
-              </button>
-              <button
-                onClick={() => {
-                  setShowComparison(!showComparison);
-                  setShowWatchlist(false);
-                  setShowAlerts(false);
-                }}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  showComparison
-                    ? 'text-blue-400 border-blue-400'
-                    : 'text-gray-400 border-transparent hover:text-blue-300'
-                }`}
-              >
-                Compare
-              </button>
-              <button
-                onClick={() => {
-                  setShowAlerts(!showAlerts);
-                  setShowWatchlist(false);
-                  setShowComparison(false);
-                }}
-                className={`px-6 py-3 font-semibold text-sm transition-all border-b-2 ${
-                  showAlerts
-                    ? 'text-purple-400 border-purple-400'
-                    : 'text-gray-400 border-transparent hover:text-purple-300'
-                }`}
-              >
-                <Bell size={16} className="inline mr-2" />
-                Alerts
-              </button>
-                </div>
-
-            {/* Watchlist Tab */}
-            {showWatchlist && (
-              <div className="mb-6">
-                <Watchlist tokens={results.allTokens} />
               </div>
-            )}
-
-            {/* Comparison Tab */}
-            {showComparison && (
-              <div className="mb-6">
-                <TokenComparison tokens={results.allTokens} />
+              {activeTab && (
+                <p className="text-gray-500 text-xs px-2">
+                  {tabs.find(t => t.id === activeTab)?.description}
+                </p>
+              )}
             </div>
-            )}
 
-            {/* Price Alerts Tab */}
-            {showAlerts && (
-              <div className="mb-6">
-                <PriceAlerts tokens={results.allTokens} />
-              </div>
-            )}
-
-            {/* Dashboard Tab */}
-            {activeTab === 'dashboard' && (
+            {/* Main Content - Matching paperhands.gm.ai style */}
+            {activeTab && filteredAndSortedTokens.length > 0 && (
               <div className="space-y-6">
-                {/* Live Portfolio & Jitter Score */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <LivePortfolio tokens={results.allTokens} />
-                  <GlassCard className="p-6">
-                    <div className="flex items-center justify-between mb-4">
+                {/* Horizontal Scrollable Token Cards */}
+                <div className="overflow-x-auto pb-4 -mx-4 sm:-mx-6 px-4 sm:px-6 scrollbar-hide">
+                  <div className="flex gap-3 sm:gap-4" style={{ width: 'max-content' }}>
+                    {filteredAndSortedTokens.slice(0, 10).map((token, index) => renderHorizontalTokenCard(token, index))}
+                    </div>
+                    </div>
+
+                {/* Tab-Specific Content Section */}
+                {(() => {
+                  const solPrice = 150; // Default, should fetch real-time
+                  
+                  // Find the token to display: selectedToken if it exists, otherwise first token
+                  let displayToken = null;
+                  
+                  if (selectedToken && selectedToken.mint) {
+                    // First try to find it in the filtered list for current tab
+                    displayToken = filteredAndSortedTokens.find(t => t.mint === selectedToken.mint);
+                    // If not in filtered list, use selectedToken directly (it has all the data we need)
+                    if (!displayToken) {
+                      displayToken = selectedToken;
+                    }
+                  }
+                  // Fallback to first token in filtered list if no valid selection
+                  if (!displayToken || !displayToken.mint) {
+                    displayToken = filteredAndSortedTokens[0];
+                  }
+                  
+                  if (!displayToken) return null;
+                  
+                  // Calculate tab-specific metrics based on displayToken
+                  let title, titleDescription, tokenAmount, usdValue, contractAddress, platform, tokenSymbol, tokenName;
+                  let gridCards = [];
+                  
+                  if (activeTab === 'paperhand') {
+                    // JitterHands: Show selected token's data (or biggest miss if no selection)
+                    const tokenToShow = displayToken;
+                    const totalMissedGains = tokenToShow?.missedGainsCurrent || 0;
+                    const totalMissedGainsSOL = totalMissedGains / solPrice;
+                    const boughtCost = tokenToShow?.totalCost || 0;
+                    const soldProceeds = tokenToShow?.actualProceeds || 0;
+                    const netResult = soldProceeds - boughtCost;
+                    
+                    // Check if value at reference price is still below buy cost
+                    // Reference price value = tokensSold × referencePriceAfterSell
+                    // We need to calculate this from the missed gains calculation
+                    const tokensSold = tokenToShow?.totalSold || 0;
+                    const referencePriceAfterSell = tokenToShow?.referencePriceAfterSell || 0;
+                    const valueAtReferencePrice = tokensSold * referencePriceAfterSell;
+                    
+                    title = 'You JitterHanded';
+                    titleDescription = 'Tokens you sold too early - showing missed post-sale upside (not guaranteed profit)';
+                    tokenAmount = tokenToShow?.totalSold || 0;
+                    usdValue = totalMissedGains;
+                    contractAddress = tokenToShow?.mint;
+                    platform = tokenToShow?.platform;
+                    tokenSymbol = tokenToShow?.symbol || 'Unknown';
+                    tokenName = tokenToShow?.name || 'Unknown Token';
+                    
+                    gridCards = [
+                      { 
+                        label: 'Bought with', 
+                        description: 'Total amount spent to buy these tokens',
+                        tooltip: 'Total SOL spent to buy these tokens',
+                        sol: boughtCost / solPrice, 
+                        usd: boughtCost,
+                        isGain: false,
+                        isLoss: false
+                      },
+                      { 
+                        label: 'Sold for', 
+                        description: 'Amount received when you sold',
+                        tooltip: 'Total SOL received when you sold',
+                        sol: soldProceeds / solPrice, 
+                        usd: soldProceeds,
+                        isGain: netResult > 0,
+                        isLoss: netResult < 0,
+                        isBreakeven: netResult === 0
+                      },
+                      { 
+                        label: 'Fumbled', 
+                        description: 'Potential gains you missed by selling early',
+                        tooltip: 'Additional value your tokens reached after you sold, compared to what you received. This represents missed post-sale upside (not guaranteed profit).',
+                        sol: totalMissedGainsSOL, 
+                        usd: totalMissedGains,
+                        isGain: false,
+                        isLoss: true // Always a loss (missed opportunity)
+                      },
+                      { 
+                        label: 'Held for', 
+                        description: 'How long you held before selling',
+                        tooltip: 'Time between first buy and final sell',
+                        value: tokenToShow?.timeHeldDays ? `${tokenToShow.timeHeldDays} ${tokenToShow.timeHeldDays === 1 ? 'Day' : 'Days'}` : '0 Days',
+                        isGain: false,
+                        isLoss: false
+                      },
+                    ];
+                  } else if (activeTab === 'roundtrip') {
+                    // RoundTrip: Show selected token or first roundtrip token
+                    const tokenToShow = displayToken;
+                    const totalRoundtripped = tokenToShow?.totalSold || 0;
+                    const totalRoundtrippedValue = tokenToShow?.actualProceeds || 0;
+                    const totalRoundtrippedSOL = totalRoundtrippedValue / solPrice;
+                    const totalBoughtValueRoundtrip = tokenToShow?.totalCost || 0;
+                    const athMcap = tokenToShow?.marketCap || tokenToShow?.ath * (tokenToShow?.totalBought || 0) || 0;
+                    const nowWorth = tokenToShow?.currentValue || 0;
+                    const roundtripResult = totalRoundtrippedValue - totalBoughtValueRoundtrip;
+                    const currentVsBought = nowWorth - totalBoughtValueRoundtrip;
+                    
+                    title = 'Total Roundtripped';
+                    titleDescription = 'Tokens you partially sold - showing roundtrip value';
+                    tokenAmount = totalRoundtripped;
+                    usdValue = totalRoundtrippedValue;
+                    contractAddress = tokenToShow?.mint;
+                    platform = tokenToShow?.platform;
+                    tokenSymbol = tokenToShow?.symbol || 'Unknown';
+                    tokenName = tokenToShow?.name || 'Unknown Token';
+                    
+                    gridCards = [
+                      { 
+                        label: 'Bought with', 
+                        description: 'Total amount invested in this token',
+                        sol: totalBoughtValueRoundtrip / solPrice, 
+                        usd: totalBoughtValueRoundtrip,
+                        isGain: false,
+                        isLoss: false
+                      },
+                      { 
+                        label: 'ATH mcap', 
+                        description: 'All-time high market capitalization',
+                        value: `$${(athMcap / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`,
+                        isGain: false,
+                        isLoss: false
+                      },
+                      { 
+                        label: 'Roundtripped', 
+                        description: 'Value of tokens you sold (partial exit)',
+                        sol: totalRoundtrippedSOL, 
+                        usd: totalRoundtrippedValue,
+                        isGain: roundtripResult > 0,
+                        isLoss: roundtripResult < 0,
+                        isBreakeven: roundtripResult === 0
+                      },
+                      { 
+                        label: 'Now worth', 
+                        description: 'Current value of remaining holdings',
+                        value: `$${nowWorth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+                        isGain: currentVsBought > 0,
+                        isLoss: currentVsBought < 0,
+                        isBreakeven: currentVsBought === 0
+                      },
+                    ];
+                  } else {
+                    // Gained: Show selected token or first gained token
+                    const tokenToShow = displayToken;
+                    const totalGained = tokenToShow?.currentHeld || 0;
+                    const totalGainedValue = tokenToShow?.currentValue || 0;
+                    const totalGainedSOL = totalGainedValue / solPrice;
+                    const totalInvestedGained = tokenToShow?.totalCost || 0;
+                    const totalInvestedGainedSOL = totalInvestedGained / solPrice;
+                    const totalGains = totalGainedValue - totalInvestedGained;
+                    const avgHoldTime = tokenToShow?.timeHeldDays || 0;
+                    
+                    title = 'Total Gained';
+                    titleDescription = 'Tokens you still hold - showing current gains/losses';
+                    tokenAmount = totalGained;
+                    usdValue = totalGainedValue;
+                    contractAddress = tokenToShow?.mint;
+                    platform = tokenToShow?.platform;
+                    tokenSymbol = tokenToShow?.symbol || 'Unknown';
+                    tokenName = tokenToShow?.name || 'Unknown Token';
+                    
+                    gridCards = [
+                      { 
+                        label: 'Invested', 
+                        description: 'Total amount you spent buying these tokens',
+                        sol: totalInvestedGainedSOL, 
+                        usd: totalInvestedGained,
+                        isGain: false,
+                        isLoss: false
+                      },
+                      { 
+                        label: 'Now worth', 
+                        description: 'Current market value of your holdings',
+                        sol: totalGainedSOL, 
+                        usd: totalGainedValue,
+                        isGain: totalGains > 0,
+                        isLoss: totalGains < 0,
+                        isBreakeven: totalGains === 0
+                      },
+                      { 
+                        label: 'Gains', 
+                        description: 'Profit or loss from your investment',
+                        sol: totalGains / solPrice, 
+                        usd: totalGains,
+                        isGain: totalGains > 0,
+                        isLoss: totalGains < 0,
+                        isBreakeven: totalGains === 0
+                      },
+                      { 
+                        label: 'Avg held', 
+                        description: 'Average number of days you\'ve held',
+                        value: `${avgHoldTime} ${avgHoldTime === 1 ? 'Day' : 'Days'}`,
+                        isGain: false,
+                        isLoss: false
+                      },
+                    ];
+                  }
+                  
+                  const formatTokenAmount = (amount) => {
+                    if (amount >= 1000000) {
+                      const millions = amount / 1000000;
+                      return `${millions.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`;
+                    }
+                    if (amount >= 1000) {
+                      const thousands = amount / 1000;
+                      return `${thousands.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}K`;
+                    }
+                    return amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                  };
+                  
+                  // Determine color for main value based on gain/loss
+                  const mainValueColor = activeTab === 'paperhand' 
+                    ? 'text-red-500' // Missed gains = loss (red)
+                    : activeTab === 'roundtrip'
+                    ? (usdValue > 0 ? 'text-green-500' : usdValue < 0 ? 'text-red-500' : 'text-white')
+                    : (usdValue > 0 ? 'text-green-500' : usdValue < 0 ? 'text-red-500' : 'text-white');
+                  
+                  return (
+                <div className="space-y-4">
                       <div>
-                        <p className="text-gray-400 text-sm mb-2">Jitter Score</p>
-                        <p className="text-green-500 text-5xl font-bold">
-                          {results.summary.jitterScore || 0}
-                        </p>
-                        <p className="text-gray-500 text-xs mt-2">
-                          {results.summary.jitterScore >= 70 ? 'Highly Jittery' : 
-                           results.summary.jitterScore >= 40 ? 'Moderately Jittery' : 
-                           'Stable Trader'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 pt-4 border-t border-[#404040]">
-                  <button 
-                        onClick={() => exportService.exportToCSV(results.allTokens, `jitterhands-${walletAddress.slice(0, 8)}`)}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm"
-                        title="Export to CSV"
-                      >
-                        <Download size={16} />
-                        CSV
-                  </button>
-                      <button
-                        onClick={() => exportService.exportToPDF(results, walletAddress)}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm"
-                        title="Export to PDF"
-                      >
-                        <FileText size={16} />
-                        PDF
-                      </button>
-                      <button
-                        onClick={async () => {
-                          const result = await exportService.copyShareableLink(walletAddress, results);
-                          if (result.success) {
-                            alert('Shareable link copied to clipboard!');
-                          } else {
-                            alert('Failed to copy link. Please copy manually: ' + result.link);
-                          }
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-[#404040] hover:bg-[#505050] rounded-lg transition text-gray-300 text-sm"
-                        title="Copy shareable link"
-                      >
-                        <Share2 size={16} />
-                        Share
-                      </button>
-              </div>
-                  </GlassCard>
-            </div>
-
-                {/* P&L Summary */}
-                <GlassCard className="p-6 hover:border-green-500 transition-all">
-                  <h3 className="text-xl font-bold text-white mb-4">Profit & Loss Summary</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="group relative">
-                      <p className="text-gray-400 text-xs mb-2">Total Invested</p>
-                      <p className="text-white text-2xl font-bold">
-                        $<AnimatedCounter value={results.summary.totalCost || 0} decimals={0} />
-                      </p>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
-                    </div>
-                    <div className="group relative">
-                      <p className="text-gray-400 text-xs mb-2">Total Proceeds</p>
-                      <p className="text-white text-2xl font-bold">
-                        $<AnimatedCounter value={results.summary.actualProceeds || 0} decimals={0} />
-                      </p>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
-                    </div>
-                    <div className="group relative">
-                      <p className="text-gray-400 text-xs mb-2">Net P&L</p>
-                      <p className={`text-2xl font-bold ${
-                        (results.summary.actualProceeds - results.summary.totalCost) >= 0 
-                          ? 'text-green-400' 
-                          : 'text-red-400'
-                      }`}>
-                        $<AnimatedCounter 
-                          value={(results.summary.actualProceeds || 0) - (results.summary.totalCost || 0)} 
-                          decimals={0} 
-                        />
-                      </p>
-                      <p className={`text-xs mt-1 ${
-                        (results.summary.actualProceeds - results.summary.totalCost) >= 0 
-                          ? 'text-green-400' 
-                          : 'text-red-400'
-                      }`}>
-                        ({results.summary.totalCost > 0 
-                          ? (((results.summary.actualProceeds - results.summary.totalCost) / results.summary.totalCost) * 100).toFixed(2)
-                          : 0}%)
-                      </p>
-                      <div className={`absolute inset-0 bg-gradient-to-r from-transparent ${
-                        (results.summary.actualProceeds - results.summary.totalCost) >= 0 
-                          ? 'via-green-500/20' 
-                          : 'via-red-500/20'
-                      } to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg`} />
+                        <p className="text-gray-400 text-sm mb-1">{title}</p>
+                        {titleDescription && (
+                          <p className="text-gray-500 text-xs mb-3">{titleDescription}</p>
+                        )}
+                        {displayToken && (
+                          <div className="flex flex-col gap-2 mb-2">
+                            <div className="flex flex-col sm:flex-row items-baseline gap-2 sm:gap-3">
+                              <span className={`${mainValueColor} text-4xl sm:text-6xl font-bold break-words`}>
+                                {formatTokenAmount(tokenAmount)} {tokenSymbol}
+                              </span>
+                              <span className={`${mainValueColor} text-base sm:text-lg font-semibold`}>
+                                (${usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                              </span>
                   </div>
-                    <div className="group relative">
-                      <p className="text-gray-400 text-xs mb-2">Current Value</p>
-                      <p className="text-green-400 text-2xl font-bold">
-                        $<AnimatedCounter value={results.summary.totalCurrentValue || 0} decimals={0} />
-                      </p>
-                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-green-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity rounded-lg" />
-                  </div>
-                </div>
-                </GlassCard>
-
-                {/* Wallet Summary */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">Missed Gains</p>
-                    <p className="text-red-400 text-lg font-semibold">
-                      ${Math.round(results.summary.totalMissedGainsCurrent || 0).toLocaleString()}
-                    </p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">If Held to ATH</p>
-                    <p className="text-green-400 text-lg font-semibold">
-                      ${Math.round(results.summary.totalWhatIfATH || 0).toLocaleString()}
-                    </p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">Avg ROI</p>
-                    <p className={`text-lg font-semibold ${
-                      (results.summary.avgROI || 0) >= 0 ? 'text-green-400' : 'text-red-400'
-                    }`}>
-                      {(results.summary.avgROI || 0).toFixed(2)}%
-                    </p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <p className="text-gray-400 text-xs mb-2">Total Tokens</p>
-                    <p className="text-white text-lg font-semibold">
-                      {results.summary.totalTokens || 0}
-                    </p>
-                  </GlassCard>
-                          </div>
-
-                {/* Currently Held Tokens */}
-                <GlassCard className="p-6">
-                  <h3 className="text-xl font-bold text-white mb-4">Currently Held Tokens</h3>
-                  {results.currentlyHeld.length > 0 ? (
-                    <div className="space-y-3">
-                      {results.currentlyHeld.map((token) => (
-                        <div key={token.mint} className="flex items-center justify-between p-3 bg-[#1a1a1a] rounded-lg hover:bg-[#252525] transition">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="relative flex-shrink-0">
-                              <TokenImage token={token} size="w-12 h-12" />
-                              {token.verified && (
-                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border border-[#1a1a1a]" />
+                            <p className="text-gray-500 text-xs">
+                              {activeTab === 'paperhand' 
+                                ? 'Amount of tokens sold • Missed gains in USD'
+                                : activeTab === 'roundtrip'
+                                ? 'Amount roundtripped • Value received in USD'
+                                : 'Amount currently held • Current value in USD'}
+                            </p>
+                    </div>
+                        )}
+                        {contractAddress && (
+                          <div className="flex items-center gap-2 text-sm">
+                            <span className="text-gray-500">CA:</span>
+                            <span className="text-white font-mono" title={contractAddress}>
+                              {contractAddress.slice(0, 4)}...{contractAddress.slice(-4)}
+                            </span>
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(contractAddress);
+                                setCopiedAddress(contractAddress);
+                                setTimeout(() => setCopiedAddress(''), 2000);
+                              }}
+                              className="text-green-400 hover:text-green-300 transition flex-shrink-0"
+                              title="Copy contract address"
+                            >
+                              {copiedAddress === contractAddress ? (
+                                <Check size={14} className="text-green-400" />
+                              ) : (
+                                <Copy size={14} />
                               )}
-                          </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-white font-semibold truncate">{token.symbol || 'Unknown'}</p>
-                                {token.isWrapped && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded flex-shrink-0">
-                                    Wrapped
-                                  </span>
-                                )}
-                                {token.verified && (
-                                  <span className="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded flex-shrink-0">
-                                    ✓
-                                  </span>
-                                )}
-                        </div>
-                              <p className="text-gray-400 text-xs truncate" title={token.name}>{token.name || 'Unknown Token'}</p>
-                              <p className="text-gray-500 text-xs font-mono truncate mt-0.5" title={token.mint}>
-                                {token.mint.slice(0, 6)}...{token.mint.slice(-4)}
-                              </p>
-                          </div>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-3">
-                            <p className="text-white font-semibold text-sm">
-                              {(token.currentHeld || 0).toFixed(2)}
-                            </p>
-                            <p className="text-green-400 text-sm font-semibold">
-                              ${Math.round(token.currentValue || 0).toLocaleString()}
-                            </p>
-                            {token.currentPrice > 0 && (
-                              <p className="text-gray-500 text-xs mt-0.5">
-                                ${(token.currentPrice || 0).toFixed(6)}
-                              </p>
+                            </button>
+                            <a
+                              href={`https://solscan.io/token/${contractAddress}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                              className="text-green-400 hover:text-green-300 transition flex-shrink-0"
+                              title="Verify token on Solscan"
+                    >
+                              <ExternalLink size={14} />
+                    </a>
+                            {platform && (
+                              <span className="text-gray-500 text-xs ml-2">{platform}</span>
                             )}
-                          </div>
-                        </div>
-                      ))}
-                          </div>
-                  ) : (
-                    <p className="text-gray-400 text-center py-4">No tokens currently held</p>
-                  )}
-                </GlassCard>
-
-                {/* Charts Section */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* P&L Chart */}
-                  <PLChart tokens={results.allTokens} />
-                  
-                  {/* Portfolio Timeline */}
-                  <PortfolioTimeline tokens={results.allTokens} />
-                  
-                  {/* ROI Distribution */}
-                  <ROIDistribution tokens={results.allTokens} />
-                  
-                  {/* Token Distribution */}
-                  <TokenDistributionChart tokens={results.allTokens} />
-                          </div>
-
-                {/* Performance Chart - Full Width */}
-                <PerformanceChart tokens={results.allTokens} />
-
-                {/* Advanced Analytics & Trading Insights */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <AdvancedAnalytics tokens={results.allTokens} />
-                  <TradingInsights tokens={results.allTokens} />
-                          </div>
-
-                {/* Transaction History */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <GlassCard className="p-4">
-                    <h4 className="text-white font-semibold mb-3">Deposits</h4>
-                    <p className="text-3xl font-bold text-green-400">{results.deposits.length}</p>
-                    <p className="text-gray-500 text-xs mt-1">Total transactions</p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <h4 className="text-white font-semibold mb-3">Withdraws</h4>
-                    <p className="text-3xl font-bold text-red-400">{results.withdraws.length}</p>
-                    <p className="text-gray-500 text-xs mt-1">Total transactions</p>
-                  </GlassCard>
-                  <GlassCard className="p-4">
-                    <h4 className="text-white font-semibold mb-3">Transfers</h4>
-                    <p className="text-3xl font-bold text-blue-400">{results.transfers.length}</p>
-                    <p className="text-gray-500 text-xs mt-1">Total transactions</p>
-                  </GlassCard>
-                          </div>
-
-                {/* Top 3 Tokens */}
-                {top3Tokens.length > 0 && (
-                          <div>
-                    <h3 className="text-xl font-bold text-white mb-4">Top 3 Tokens</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {top3Tokens.map((token, index) => renderTokenCard(token, index, true))}
-                          </div>
-                        </div>
-                )}
-
-                {/* Rest of tokens dropdown */}
-                {restTokens.length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-4">Other Tokens</h3>
-                    <select
-                      value={selectedTokenFromDropdown}
-                      onChange={(e) => setSelectedTokenFromDropdown(e.target.value)}
-                      className="w-full bg-[#2a2a2a] border border-[#404040] rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-green-500"
-                    >
-                      <option value="">Select a token to view details...</option>
-                      {restTokens.map((token, index) => (
-                        <option key={token.mint} value={token.mint}>
-                          #{index + 4} {token.symbol} - ${Math.round(token.missedGainsCurrent || 0).toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedTokenData && (
-                      <div className="mt-4">
-                        {renderTokenCard(selectedTokenData, restTokens.findIndex(t => t.mint === selectedTokenFromDropdown) + 3, false)}
-                      </div>
-                    )}
                   </div>
+                        )}
+                        {/* Display token name/ticker properly */}
+                        {displayToken && (
+                          <div className="flex items-center gap-2 text-xs mt-1">
+                            <span className="text-gray-500">Ticker:</span>
+                            <span className="text-white font-semibold">{tokenSymbol}</span>
+                            {tokenName && tokenName !== tokenSymbol && (
+                              <>
+                                <span className="text-gray-500">•</span>
+                                <span className="text-gray-400" title={tokenName}>{tokenName}</span>
+                              </>
+                            )}
+                </div>
+              )}
+                      </div>
+
+                      {/* 2x2 Transaction Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {gridCards.map((card, idx) => {
+                          // Determine color based on gain/loss/breakeven
+                          let valueColor = 'text-white';
+                          if (card.isGain) valueColor = 'text-green-500';
+                          else if (card.isLoss) valueColor = 'text-red-500';
+                          else if (card.isBreakeven) valueColor = 'text-white';
+                          
+                          return (
+                            <GlassCard key={idx} className="p-4">
+                              <div className="flex items-center gap-1 mb-1">
+                                <p className="text-gray-400 text-xs">{card.label}</p>
+                                {card.tooltip && (
+                                  <span 
+                                    className="text-gray-500 text-xs cursor-help"
+                                    title={card.tooltip}
+                                  >
+                                    ⓘ
+                                  </span>
+                                )}
+                              </div>
+                              {card.description && (
+                                <p className="text-gray-500 text-xs mb-2 italic">{card.description}</p>
+                              )}
+                              {card.value ? (
+                                <p className={`${valueColor} text-lg font-semibold`}>{card.value}</p>
+                              ) : (
+                                <>
+                                  <div className="flex items-center gap-2">
+                                    <span className={`${valueColor} text-lg font-semibold`}>
+                                      {card.sol.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
+                                    <img 
+                                      src="https://raw.githubusercontent.com/solana-labs/token-list/main/assets/mainnet/So11111111111111111111111111111111111111112/logo.png" 
+                                      alt="SOL" 
+                                      className="w-5 h-5"
+                                      onError={(e) => {
+                                        e.target.src = 'https://cryptologos.cc/logos/solana-sol-logo.png';
+                                      }}
+                                    />
+                          </div>
+                                  <p className={`${valueColor} text-xs mt-1 font-medium`}>
+                                    (${card.usd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
+                                  </p>
+                                  <p className="text-gray-500 text-xs mt-1">
+                                    {card.label === 'Bought with' || card.label === 'Invested' 
+                                      ? 'Amount spent'
+                                      : card.label === 'Sold for' || card.label === 'Roundtripped'
+                                      ? 'Amount received'
+                                      : card.label === 'Fumbled'
+                                      ? 'Missed opportunity value'
+                                      : card.label === 'Now worth'
+                                      ? 'Current market value'
+                                      : card.label === 'Gains'
+                                      ? 'Profit or loss amount'
+                                      : 'Value'}
+                                  </p>
+                                </>
+                              )}
+                            </GlassCard>
+                          );
+                        })}
+                          </div>
+
+                      {/* Warning if value at reference price is still below buy cost */}
+                      {activeTab === 'paperhand' && (() => {
+                        const tokenToShow = displayToken;
+                        const tokensSold = tokenToShow?.totalSold || 0;
+                        const referencePriceAfterSell = tokenToShow?.referencePriceAfterSell || 0;
+                        const boughtCost = tokenToShow?.totalCost || 0;
+                        
+                        // Calculate value at reference price: tokensSold × referencePriceAfterSell
+                        const valueAtReferencePrice = tokensSold * referencePriceAfterSell;
+                        const showWarning = referencePriceAfterSell > 0 && valueAtReferencePrice > 0 && valueAtReferencePrice < boughtCost;
+                        
+                        if (showWarning) {
+                          return (
+                            <div className="mt-4 p-3 bg-yellow-500/20 border border-yellow-500/30 rounded-lg">
+                              <p className="text-yellow-300 text-xs font-medium">
+                                ⚠️ Info: The value at reference price (${valueAtReferencePrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}) is still below your buy cost (${boughtCost.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}). This represents missed post-sale upside, not guaranteed profit.
+                              </p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+
+                      {/* Verification Section */}
+                      <div className="mt-4 p-4 bg-[#1a1a1a] rounded-lg border border-[#404040]">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-gray-400 text-sm font-semibold">Data Verification</p>
+                          <span className="text-gray-500 text-xs">
+                            {results.transactions?.length || 0} transactions analyzed
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-3">
+                          <a
+                            href={`https://solscan.io/account/${walletAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-[#2a2a2a] hover:bg-[#404040] border border-[#404040] rounded-lg transition text-white text-sm"
+                          >
+                            <ExternalLink size={14} />
+                            View Wallet on Solscan
+                          </a>
+                          <a
+                            href={`https://explorer.solana.com/address/${walletAddress}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 px-3 py-2 bg-[#2a2a2a] hover:bg-[#404040] border border-[#404040] rounded-lg transition text-white text-sm"
+                          >
+                            <ExternalLink size={14} />
+                            View on Solana Explorer
+                          </a>
+                          {contractAddress && (
+                            <a
+                              href={`https://solscan.io/token/${contractAddress}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition text-white text-sm font-semibold"
+                            >
+                              <ExternalLink size={14} />
+                              Verify Token
+                            </a>
                   )}
+                </div>
+                        <p className="text-gray-500 text-xs mt-3">
+                          Data sourced from Helius API • Last updated: {results.lastUpdated ? new Date(results.lastUpdated).toLocaleString() : 'N/A'}
+                        </p>
+                          </div>
+                          </div>
+                  );
+                })()}
+
+                {/* Bottom Action Bar - Matching paperhands.gm.ai */}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6 border-t border-[#404040]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-gray-400 text-xs sm:text-sm">Wallet Address</span>
+                    <span className="text-white font-mono text-xs sm:text-sm break-all">{walletAddress.slice(0, 6)}...{walletAddress.slice(-4)}</span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(walletAddress);
+                        setCopiedAddress(walletAddress);
+                        setTimeout(() => setCopiedAddress(''), 2000);
+                      }}
+                      className="text-green-400 hover:text-green-300 transition flex-shrink-0"
+                      title="Copy wallet address"
+                    >
+                      {copiedAddress === walletAddress ? (
+                        <Check size={14} className="text-green-400" />
+                      ) : (
+                        <Copy size={14} />
+                      )}
+                    </button>
+                    <a
+                      href={`https://solscan.io/account/${walletAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                      className="text-green-400 hover:text-green-300 transition flex-shrink-0"
+                      title="Verify wallet on Solscan"
+                        >
+                      <ExternalLink size={14} />
+                        </a>
+                      </div>
+                  <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+                    <button
+                      onClick={() => setShowSearchModal(true)}
+                      className="flex-1 sm:flex-none bg-[#2a2a2a] hover:bg-[#404040] border border-[#404040] text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all text-sm"
+                    >
+                      Checker
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const result = await exportService.copyShareableLink(walletAddress, results);
+                        if (result.success) {
+                          alert('Shareable link copied to clipboard!');
+                        } else {
+                          alert('Failed to copy link. Please copy manually: ' + result.link);
+                        }
+                      }}
+                      className="flex-1 sm:flex-none bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-all text-sm"
+                    >
+                      <Share2 size={16} />
+                      Share
+                    </button>
+                </div>
+            </div>
                 </div>
               )}
 
-            {/* Other Tabs (Paperhand, Roundtrip, Gained) */}
-            {activeTab !== 'dashboard' && (
-              <>
-                {/* Search and Filter Controls */}
-                <GlassCard className="p-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                      <label className="text-gray-400 text-xs mb-2 block">Search Tokens</label>
-                      <input
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search by symbol, name, or address..."
-                        className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-green-500 transition-all text-sm"
-                      />
-                          </div>
-                          <div>
-                      <label className="text-gray-400 text-xs mb-2 block">Sort By</label>
-                      <select
-                        value={sortBy}
-                        onChange={(e) => setSortBy(e.target.value)}
-                        className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-green-500 transition-all text-sm"
-                      >
-                        <option value="missedGains">Missed Gains</option>
-                        <option value="roi">ROI If Held</option>
-                        <option value="holdTime">Hold Time</option>
-                        <option value="symbol">Symbol (A-Z)</option>
-                      </select>
-                          </div>
-                          <div>
-                      <label className="text-gray-400 text-xs mb-2 block">Date Range</label>
-                      <select
-                        value={dateFilter}
-                        onChange={(e) => setDateFilter(e.target.value)}
-                        className="w-full bg-[#1a1a1a] border border-[#404040] rounded-lg px-3 py-2 text-white focus:outline-none focus:border-green-500 transition-all text-sm"
-                      >
-                        <option value="all">All Time</option>
-                        <option value="7d">Last 7 Days</option>
-                        <option value="30d">Last 30 Days</option>
-                        <option value="90d">Last 90 Days</option>
-                        <option value="1y">Last Year</option>
-                      </select>
-                          </div>
-                  </div>
-                </GlassCard>
-
-                {/* Summary */}
-                {filteredAndSortedTokens.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-baseline gap-4">
-                          <div>
-                        <p className="text-gray-400 text-sm mb-2">Total Paperhanded</p>
-                        <div className="flex items-baseline gap-3">
-                          <span className="text-green-500 text-5xl font-bold">
-                            ${Math.round(results.summary.totalMissedGainsCurrent || 0).toLocaleString()}
-                          </span>
-                          <span className="text-gray-500 text-lg">
-                            ({filteredAndSortedTokens.length} tokens)
-                          </span>
-                          </div>
-                      </div>
-                          </div>
-                          </div>
-                )}
-
-                {/* Charts for filtered tokens */}
-                {filteredAndSortedTokens.length > 0 && (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                    <PLChart tokens={filteredAndSortedTokens} />
-                    <ROIDistribution tokens={filteredAndSortedTokens} />
-                          </div>
-                )}
-
-                {/* Top 3 Tokens */}
-                {top3Tokens.length > 0 && (
-                          <div>
-                    <h3 className="text-xl font-bold text-white mb-4">Top 3 Tokens</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {top3Tokens.map((token, index) => renderTokenCard(token, index, true))}
-                          </div>
-                        </div>
-                )}
-
-                {/* Rest of tokens dropdown */}
-                {restTokens.length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-4">Other Tokens</h3>
-                    <select
-                      value={selectedTokenFromDropdown}
-                      onChange={(e) => setSelectedTokenFromDropdown(e.target.value)}
-                      className="w-full bg-[#2a2a2a] border border-[#404040] rounded-lg px-4 py-3 text-white mb-4 focus:outline-none focus:border-green-500"
-                    >
-                      <option value="">Select a token to view details...</option>
-                      {restTokens.map((token, index) => (
-                        <option key={token.mint} value={token.mint}>
-                          #{index + 4} {token.symbol} - ${Math.round(token.missedGainsCurrent || 0).toLocaleString()}
-                        </option>
-                      ))}
-                    </select>
-                    {selectedTokenData && (
-                      <div className="mt-4">
-                        {renderTokenCard(selectedTokenData, restTokens.findIndex(t => t.mint === selectedTokenFromDropdown) + 3, false)}
-                      </div>
-                  )}
-                </div>
-              )}
-
-                {filteredAndSortedTokens.length === 0 && (
-                  <GlassCard className="p-12 text-center">
-                    <p className="text-gray-400 text-lg">No tokens found matching your filters.</p>
-                  </GlassCard>
-                )}
-              </>
+            {filteredAndSortedTokens.length === 0 && (
+              <GlassCard className="p-12 text-center">
+                <p className="text-gray-400 text-lg">No tokens found matching your filters.</p>
+              </GlassCard>
             )}
 
-            {/* Footer */}
-            <GlassCard className="p-4">
-              <p className="text-gray-400 text-xs text-center">
-                <span className="font-semibold">Data Sources:</span> Transactions from Helius, Token data (prices, ATH) from BirdEye. Real-time analysis.
-              </p>
-            </GlassCard>
+
+            {/* Footer - Matching paperhands.gm.ai */}
+            <div className="text-center py-6 space-y-3">
+              <p className="text-gray-400 text-sm">Powered by JitterHands.fun</p>
+              <div className="flex items-center justify-center gap-4">
+                <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">
+                  <span className="text-xl">𝕏</span>
+                </a>
+                <a href="https://t.me" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">
+                  <span className="text-xl">✈️</span>
+                </a>
+                <a href="https://discord.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition">
+                  <span className="text-xl">💬</span>
+                </a>
+            </div>
+            </div>
           </div>
         )}
       </div>
+
+      {/* Search Modal */}
+      <SearchModal
+        isOpen={showSearchModal}
+        onClose={() => setShowSearchModal(false)}
+        onSearch={async (address) => {
+          setWalletAddress(address); // Set the address first
+          setShowSearchModal(false);
+          setError(''); // Clear any previous errors
+          // Wait a bit longer and ensure address is set before fetching
+          await new Promise(resolve => setTimeout(resolve, 150));
+          // Double-check address is set before calling fetchWalletData
+          if (address && address.trim()) {
+            fetchWalletData();
+          }
+        }}
+        loading={loading}
+      />
 
       {/* Donation Support Section - Bottom */}
       <DonationSupport position="bottom" />
