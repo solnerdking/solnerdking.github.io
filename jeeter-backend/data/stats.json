@@ -1,6 +1,6 @@
 {
   "visits": 2,
-  "walletScans": 1,
+  "walletScans": 0,
   "leaderboard": [
     {
       "walletAddress": "rKwPeaDrHqpmwFx4qbYttSTsUWqtAE4gsFr6MVKbTo5",
@@ -43,7 +43,21 @@
       "actualProceeds": 0.15,
       "totalCurrentValue": 0,
       "lastUpdated": "2026-01-11T21:39:01.468Z"
+    },
+    {
+      "walletAddress": "7sLkaFqXtv5SqmUDHS8aE3uCk79f5gEUjMEpER1stSbV",
+      "address": "7sLkaFqXtv5SqmUDHS8aE3uCk79f5gEUjMEpER1stSbV",
+      "paperhandedValue": 0,
+      "totalMissedGains": 0,
+      "jitterScore": 0,
+      "biggestMissValue": 0,
+      "biggestMissToken": "Unknown",
+      "totalTokens": 0,
+      "totalCost": 0,
+      "actualProceeds": 0,
+      "totalCurrentValue": 0,
+      "lastUpdated": "2026-01-11T22:12:20.750Z"
     }
   ],
-  "lastUpdated": "2026-01-11T22:12:20.222Z"
+  "lastUpdated": "2026-01-11T22:12:20.928Z"
 }
