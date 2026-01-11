@@ -1,7 +1,21 @@
 {
   "visits": 2,
-  "walletScans": 1,
+  "walletScans": 0,
   "leaderboard": [
+    {
+      "walletAddress": "H1PqJguV6W4FsrTwHoarJn8tip7U47tgrkXzuxoqLSv",
+      "address": "H1PqJguV6W4FsrTwHoarJn8tip7U47tgrkXzuxoqLSv",
+      "paperhandedValue": 273.1,
+      "totalMissedGains": 273.1,
+      "jitterScore": 76,
+      "biggestMissValue": 169.66,
+      "biggestMissToken": "USD1",
+      "totalTokens": 12,
+      "totalCost": 421.93000000000006,
+      "actualProceeds": 465.1099999999999,
+      "totalCurrentValue": 0.63,
+      "lastUpdated": "2026-01-11T22:03:36.164Z"
+    },
     {
       "walletAddress": "9rmHyKgTM7EYtE2idwZKmBEFQRqq2ExKtM2pqgGkxv9U",
       "address": "9rmHyKgTM7EYtE2idwZKmBEFQRqq2ExKtM2pqgGkxv9U",
@@ -31,5 +45,5 @@
       "lastUpdated": "2026-01-11T21:39:01.468Z"
     }
   ],
-  "lastUpdated": "2026-01-11T22:03:35.676Z"
+  "lastUpdated": "2026-01-11T22:03:36.385Z"
 }
