@@ -1,6 +1,6 @@
 {
-  "visits": 1,
-  "walletScans": 0,
+  "visits": 0,
+  "walletScans": 1,
   "leaderboard": [
     {
       "walletAddress": "E6LSmJh3ijq2QNyipmJE4a9RQtSY7BmAUKfN3yter2vw",
@@ -17,5 +17,5 @@
       "lastUpdated": "2026-01-11T21:39:01.468Z"
     }
   ],
-  "lastUpdated": "2026-01-11T21:39:14.718Z"
+  "lastUpdated": "2026-01-11T21:39:19.711Z"
 }
