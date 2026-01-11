@@ -1,5 +1,5 @@
 {
-  "visits": 2,
+  "visits": 3,
   "walletScans": 0,
   "leaderboard": [
     {
@@ -15,20 +15,6 @@
       "actualProceeds": 7500.51,
       "totalCurrentValue": 218725.85,
       "lastUpdated": "2026-01-11T22:04:35.996Z"
-    },
-    {
-      "walletAddress": "3kebnKw7cPdSkLRfiMEALyZJGZ4wdiSRvmoN4rD1yPzV",
-      "address": "3kebnKw7cPdSkLRfiMEALyZJGZ4wdiSRvmoN4rD1yPzV",
-      "paperhandedValue": 3944.67,
-      "totalMissedGains": 3944.67,
-      "jitterScore": 63,
-      "biggestMissValue": 1198.05,
-      "biggestMissToken": "MoMA",
-      "totalTokens": 24,
-      "totalCost": 9824.92,
-      "actualProceeds": 26335.18999999998,
-      "totalCurrentValue": 5396.67,
-      "lastUpdated": "2026-01-11T22:12:02.750Z"
     },
     {
       "walletAddress": "9rmHyKgTM7EYtE2idwZKmBEFQRqq2ExKtM2pqgGkxv9U",
@@ -59,5 +45,5 @@
       "lastUpdated": "2026-01-11T21:39:01.468Z"
     }
   ],
-  "lastUpdated": "2026-01-11T22:12:02.979Z"
+  "lastUpdated": "2026-01-11T22:12:16.946Z"
 }
