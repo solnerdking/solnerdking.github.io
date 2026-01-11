@@ -1,21 +1,7 @@
 {
   "visits": 2,
-  "walletScans": 0,
+  "walletScans": 1,
   "leaderboard": [
-    {
-      "walletAddress": "rKwPeaDrHqpmwFx4qbYttSTsUWqtAE4gsFr6MVKbTo5",
-      "address": "rKwPeaDrHqpmwFx4qbYttSTsUWqtAE4gsFr6MVKbTo5",
-      "paperhandedValue": 193232.56,
-      "totalMissedGains": 193232.56,
-      "jitterScore": 83,
-      "biggestMissValue": 182951.45,
-      "biggestMissToken": "TRUMP",
-      "totalTokens": 3,
-      "totalCost": 6962.240000000001,
-      "actualProceeds": 7500.51,
-      "totalCurrentValue": 218725.85,
-      "lastUpdated": "2026-01-11T22:04:03.549Z"
-    },
     {
       "walletAddress": "9rmHyKgTM7EYtE2idwZKmBEFQRqq2ExKtM2pqgGkxv9U",
       "address": "9rmHyKgTM7EYtE2idwZKmBEFQRqq2ExKtM2pqgGkxv9U",
@@ -45,5 +31,5 @@
       "lastUpdated": "2026-01-11T21:39:01.468Z"
     }
   ],
-  "lastUpdated": "2026-01-11T22:04:03.862Z"
+  "lastUpdated": "2026-01-11T22:04:17.155Z"
 }
