@@ -1,6 +1,21 @@
 {
   "visits": 0,
-  "walletScans": 1,
-  "leaderboard": [],
-  "lastUpdated": "2026-01-11T21:38:54.374Z"
+  "walletScans": 0,
+  "leaderboard": [
+    {
+      "walletAddress": "E6LSmJh3ijq2QNyipmJE4a9RQtSY7BmAUKfN3yter2vw",
+      "address": "E6LSmJh3ijq2QNyipmJE4a9RQtSY7BmAUKfN3yter2vw",
+      "paperhandedValue": 0,
+      "totalMissedGains": 0,
+      "jitterScore": 60,
+      "biggestMissValue": 0,
+      "biggestMissToken": "BK8V",
+      "totalTokens": 1,
+      "totalCost": 0.38,
+      "actualProceeds": 0.15,
+      "totalCurrentValue": 0,
+      "lastUpdated": "2026-01-11T21:38:54.933Z"
+    }
+  ],
+  "lastUpdated": "2026-01-11T21:38:55.097Z"
 }
