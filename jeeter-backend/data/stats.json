@@ -1,6 +1,21 @@
 {
   "visits": 0,
-  "walletScans": 1,
-  "leaderboard": [],
-  "lastUpdated": "2026-01-11T21:37:58.307Z"
+  "walletScans": 0,
+  "leaderboard": [
+    {
+      "walletAddress": "G2L9GVGncXHKKHyu3G18J3NqPRd4TpL9V3WocVh7Znmh",
+      "address": "G2L9GVGncXHKKHyu3G18J3NqPRd4TpL9V3WocVh7Znmh",
+      "paperhandedValue": 0,
+      "totalMissedGains": 0,
+      "jitterScore": 0,
+      "biggestMissValue": 0,
+      "biggestMissToken": "Unknown",
+      "totalTokens": 0,
+      "totalCost": 0,
+      "actualProceeds": 0,
+      "totalCurrentValue": 0,
+      "lastUpdated": "2026-01-11T21:37:58.759Z"
+    }
+  ],
+  "lastUpdated": "2026-01-11T21:37:58.910Z"
 }
