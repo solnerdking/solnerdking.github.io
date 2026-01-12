@@ -1,3 +1,380 @@
+// Helper function to parse RPC transaction to Helius-compatible format
+function parseRPCTransaction(rpcTx, walletAddress) {
+  if (!rpcTx || !rpcTx.transaction || !rpcTx.transaction.message) {
+    return null;
+  }
+
+  const tx = rpcTx.transaction;
+  const message = tx.message;
+  const blockTime = rpcTx.blockTime || Math.floor(Date.now() / 1000);
+  const meta = rpcTx.meta || {};
+  
+  // Extract token transfers from transaction
+  const tokenTransfers = [];
+  
+  // Get account keys
+  const accountKeys = message.accountKeys || [];
+  const walletLower = walletAddress.toLowerCase();
+  
+  // Parse pre/post token balances to detect transfers
+  const postTokenBalances = meta.postTokenBalances || [];
+  const preTokenBalances = meta.preTokenBalances || [];
+  
+  // Create a map of token account changes
+  const tokenAccountChanges = new Map();
+  
+  // Process each post-token balance
+  postTokenBalances.forEach((post) => {
+    const pre = preTokenBalances.find(p => 
+      p.accountIndex === post.accountIndex && 
+      p.mint === post.mint
+    );
+    
+    if (pre) {
+      const preAmount = parseFloat(pre.uiTokenAmount?.uiAmountString || pre.uiTokenAmount?.amount || '0');
+      const postAmount = parseFloat(post.uiTokenAmount?.uiAmountString || post.uiTokenAmount?.amount || '0');
+      const change = postAmount - preAmount;
+      
+      if (Math.abs(change) > 0.000000001) { // Significant change
+        const accountKey = accountKeys[post.accountIndex];
+        const owner = post.owner || accountKey;
+        const mint = post.mint;
+        const ownerLower = (owner || '').toLowerCase();
+        
+        // Only process if wallet is involved
+        if (ownerLower === walletLower) {
+          const key = `${mint}_${post.accountIndex}`;
+          if (!tokenAccountChanges.has(key)) {
+            tokenAccountChanges.set(key, {
+              mint,
+              accountIndex: post.accountIndex,
+              accountKey: accountKey,
+              owner: owner,
+              preAmount,
+              postAmount,
+              change,
+            });
+          }
+        }
+      }
+    }
+  });
+  
+  // Also check pre-token balances that might have been closed (balance went to 0)
+  preTokenBalances.forEach((pre) => {
+    const post = postTokenBalances.find(p => 
+      p.accountIndex === pre.accountIndex && 
+      p.mint === pre.mint
+    );
+    
+    if (!post) {
+      // Account was closed or balance went to zero
+      const preAmount = parseFloat(pre.uiTokenAmount?.uiAmountString || pre.uiTokenAmount?.amount || '0');
+      if (preAmount > 0.000000001) {
+        const owner = pre.owner;
+        const ownerLower = (owner || '').toLowerCase();
+        
+        if (ownerLower === walletLower) {
+          const accountKey = accountKeys[pre.accountIndex];
+          const key = `${pre.mint}_${pre.accountIndex}_closed`;
+          
+          if (!tokenAccountChanges.has(key)) {
+            tokenAccountChanges.set(key, {
+              mint: pre.mint,
+              accountIndex: pre.accountIndex,
+              accountKey: accountKey,
+              owner: owner,
+              preAmount,
+              postAmount: 0,
+              change: -preAmount, // All tokens were removed
+            });
+          }
+        }
+      }
+    }
+  });
+  
+  // Convert balance changes to token transfers
+  // Group by mint to find matching pairs
+  const transfersByMint = new Map();
+  
+  tokenAccountChanges.forEach((change, key) => {
+    if (!transfersByMint.has(change.mint)) {
+      transfersByMint.set(change.mint, []);
+    }
+    transfersByMint.get(change.mint).push(change);
+  });
+  
+  // Create transfers from balance changes
+  transfersByMint.forEach((changes, mint) => {
+    // Separate incoming and outgoing
+    const outgoing = changes.filter(c => c.change < 0);
+    const incoming = changes.filter(c => c.change > 0);
+    
+    // Process outgoing (sells/transfers out)
+    outgoing.forEach(out => {
+      const amount = Math.abs(out.change);
+      tokenTransfers.push({
+        mint,
+        tokenAmount: amount.toString(),
+        tokenSymbol: null, // Will be filled later by token metadata APIs
+        tokenName: null, // Will be filled later
+        fromUserAccount: true, // Wallet is sending
+        toUserAccount: false,
+        fromTokenAccount: out.accountKey,
+        toTokenAccount: null, // Unknown from balance change alone
+        priceUsd: 0, // Will be filled later by price APIs
+      });
+    });
+    
+    // Process incoming (buys/transfers in)
+    incoming.forEach(in => {
+      const amount = in.change;
+      tokenTransfers.push({
+        mint,
+        tokenAmount: amount.toString(),
+        tokenSymbol: null, // Will be filled later
+        tokenName: null, // Will be filled later
+        fromUserAccount: false,
+        toUserAccount: true, // Wallet is receiving
+        fromTokenAccount: null, // Unknown from balance change alone
+        toTokenAccount: in.accountKey,
+        priceUsd: 0, // Will be filled later by price APIs
+      });
+    });
+  });
+  
+  // If no token transfers found, return null
+  if (tokenTransfers.length === 0) {
+    return null; // No token transfers involving this wallet
+  }
+  
+  return {
+    signature: tx.signatures?.[0] || '',
+    timestamp: blockTime,
+    blockTime,
+    type: 'TRANSFER',
+    description: `Token transfer transaction`,
+    tokenTransfers,
+    source: 'RPC',
+  };
+}
+
+// Fetch transactions using Solana RPC (primary source)
+async function fetchWithRPC(walletAddress) {
+  // Expanded list of free public RPC endpoints
+  const rpcEndpoints = [
+    'https://api.mainnet-beta.solana.com', // Official Solana RPC
+    'https://solana-api.projectserum.com',
+    'https://rpc.ankr.com/solana',
+    'https://solana.public-rpc.com',
+    'https://rpc.solana.com',
+    'https://solana-rpc.publicnode.com', // PublicNode
+  ];
+  
+  let lastError = null;
+  
+  // Try each RPC endpoint
+  for (const rpcUrl of rpcEndpoints) {
+    try {
+      console.log(`Attempting RPC with ${rpcUrl}`);
+      
+      // Step 1: Get transaction signatures
+      const signaturesResponse = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'getSignaturesForAddress',
+          params: [
+            walletAddress,
+            { limit: 100 }
+          ],
+        }),
+      });
+      
+      if (!signaturesResponse.ok) {
+        throw new Error(`RPC endpoint returned ${signaturesResponse.status}`);
+      }
+      
+      const signaturesData = await signaturesResponse.json();
+      
+      if (signaturesData.error) {
+        throw new Error(signaturesData.error.message || 'RPC error');
+      }
+      
+      const signatures = signaturesData.result || [];
+      
+      if (signatures.length === 0) {
+        return { success: true, data: [], source: 'RPC' };
+      }
+      
+      console.log(`Found ${signatures.length} transaction signatures, fetching details...`);
+      
+      // Step 2: Get transaction details in batches (optimized: 5-8 parallel for better reliability)
+      const batchSize = 8; // Reduced from 10 to avoid rate limiting
+      const transactions = [];
+      
+      for (let i = 0; i < signatures.length; i += batchSize) {
+        const batch = signatures.slice(i, i + batchSize);
+        const batchPromises = batch.map(sig => 
+          fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'getTransaction',
+              params: [
+                sig.signature,
+                {
+                  encoding: 'jsonParsed',
+                  maxSupportedTransactionVersion: 0
+                }
+              ],
+            }),
+            signal: AbortSignal.timeout(30000), // 30 second timeout per request
+          }).then(res => res.json())
+            .then(data => ({ signature: sig.signature, data: data.result }))
+            .catch(err => {
+              if (err.name !== 'AbortError') {
+                console.error(`Error fetching transaction ${sig.signature.slice(0, 8)}...:`, err.message);
+              }
+              return null;
+            })
+        );
+        
+        const batchResults = await Promise.all(batchPromises);
+        batchResults.forEach(result => {
+          if (result && result.data) {
+            const parsed = parseRPCTransaction(result.data, walletAddress);
+            if (parsed) {
+              transactions.push(parsed);
+            }
+          }
+        });
+        
+        // Adaptive delay between batches to avoid rate limiting (longer delay for more requests)
+        if (i + batchSize < signatures.length) {
+          const delay = Math.min(300, 100 + (i / batchSize) * 20); // 100-300ms delay
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+      
+      console.log(`RPC successful: ${transactions.length} transactions parsed from ${rpcUrl}`);
+      
+      return {
+        success: true,
+        data: transactions,
+        source: 'RPC',
+        rpcEndpoint: rpcUrl
+      };
+      
+    } catch (error) {
+      console.error(`RPC endpoint ${rpcUrl} failed:`, error.message);
+      lastError = error;
+      continue; // Try next endpoint
+    }
+  }
+  
+  throw new Error(`All RPC endpoints failed. Last error: ${lastError?.message || 'Unknown error'}`);
+}
+
+// Helius API Keys (primary and secondary)
+const HELIUS_KEYS = {
+  PRIMARY: process.env.HELIUS_API_KEY_PRIMARY || '1866fd12-52ed-453b-9cce-31c7f553dd67',
+  SECONDARY: process.env.HELIUS_API_KEY_SECONDARY || 'b6cbae84-b87b-439b-8b89-56612e3e903a',
+};
+
+// Fetch with Helius keys (primary -> secondary -> RPC fallback)
+async function fetchWithHeliusKeys(walletAddress) {
+  // Try primary key first
+  try {
+    const primaryUrl = `https://api.helius.xyz/v0/addresses/${walletAddress}/transactions?api-key=${HELIUS_KEYS.PRIMARY}&limit=100`;
+    console.log('Attempting Helius PRIMARY key...');
+    
+    const primaryResponse = await fetch(primaryUrl, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (primaryResponse.ok) {
+      const data = await primaryResponse.json();
+      console.log(`Helius PRIMARY successful: ${data.length} transactions`);
+      return {
+        success: true,
+        data: data,
+        source: 'HELIUS_PRIMARY'
+      };
+    }
+    
+    // If 429 or other error, log and try secondary
+    if (primaryResponse.status === 429) {
+      console.log('Helius PRIMARY rate limited (429), trying SECONDARY...');
+    } else {
+      console.log(`Helius PRIMARY error (${primaryResponse.status}), trying SECONDARY...`);
+    }
+  } catch (error) {
+    console.log('Helius PRIMARY failed:', error.message, '- trying SECONDARY...');
+  }
+  
+  // Try secondary key
+  try {
+    const secondaryUrl = `https://api.helius.xyz/v0/addresses/${walletAddress}/transactions?api-key=${HELIUS_KEYS.SECONDARY}&limit=100`;
+    console.log('Attempting Helius SECONDARY key...');
+    
+    const secondaryResponse = await fetch(secondaryUrl, {
+      headers: { 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    
+    if (secondaryResponse.ok) {
+      const data = await secondaryResponse.json();
+      console.log(`Helius SECONDARY successful: ${data.length} transactions`);
+      return {
+        success: true,
+        data: data,
+        source: 'HELIUS_SECONDARY'
+      };
+    }
+    
+    // If 429 or other error, log and use RPC fallback
+    if (secondaryResponse.status === 429) {
+      console.log('Helius SECONDARY rate limited (429) or out of credits, using RPC fallback...');
+    } else {
+      console.log(`Helius SECONDARY error (${secondaryResponse.status}), using RPC fallback...`);
+    }
+  } catch (error) {
+    console.log('Helius SECONDARY failed:', error.message, '- using RPC fallback...');
+  }
+  
+  // Both keys failed, use RPC fallback
+  console.log('Both Helius keys failed, using RPC fallback...');
+  return await fetchWithRPC(walletAddress);
+}
+
+// Rate limiting: simple in-memory store (resets on serverless cold start)
+const rateLimitStore = new Map();
+
+// Simple rate limiting: max 10 requests per minute per IP
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const key = ip || 'default';
+  const requests = rateLimitStore.get(key) || [];
+  
+  // Remove requests older than 1 minute
+  const recentRequests = requests.filter(time => now - time < 60000);
+  
+  if (recentRequests.length >= 10) {
+    return false; // Rate limited
+  }
+  
+  recentRequests.push(now);
+  rateLimitStore.set(key, recentRequests);
+  return true; // Allowed
+}
+
 export default async function handler(req, res) {
   // Log the request for debugging
   console.log('Request received:', {
@@ -139,8 +516,8 @@ export default async function handler(req, res) {
 
   try {
     // Validate endpoint
-    if (!endpoint || (endpoint !== 'solscan' && endpoint !== 'birdeye' && endpoint !== 'helius' && endpoint !== 'helius-token' && endpoint !== 'coingecko' && endpoint !== 'dexscreener')) {
-      return res.status(400).json({ success: false, error: 'Invalid endpoint. Use "solscan", "helius", "birdeye", "helius-token", "coingecko", or "dexscreener"' });
+    if (!endpoint || (endpoint !== 'solscan' && endpoint !== 'birdeye' && endpoint !== 'helius' && endpoint !== 'helius-token' && endpoint !== 'coingecko' && endpoint !== 'dexscreener' && endpoint !== 'pumpfun' && endpoint !== 'solana-balance')) {
+      return res.status(400).json({ success: false, error: 'Invalid endpoint. Use "solscan", "helius", "birdeye", "helius-token", "coingecko", "dexscreener", "pumpfun", or "solana-balance"' });
     }
 
     let url = '';
@@ -152,30 +529,71 @@ export default async function handler(req, res) {
       // Try the Solscan API endpoint
       url = `https://api.solscan.io/account/transfers?account=${wallet}&limit=100`;
     } else if (endpoint === 'helius') {
-      // Alternative: Use Helius API (more reliable, but requires API key)
-      // For now, we'll note this as an option
+      // Use Helius keys (primary -> secondary -> RPC fallback)
       if (!wallet) {
         return res.status(400).json({ success: false, error: 'Wallet address required' });
       }
-      // Helius requires API key - would need to be set as environment variable
-      // TEMPORARY: Fallback to hardcoded key for testing (REMOVE IN PRODUCTION)
-      const heliusApiKey = process.env.HELIUS_API_KEY || '1ac688b0-f67c-4bd5-a95d-e8cdd82e17b5';
-      console.log('Helius API key check:', {
-        hasKey: !!heliusApiKey,
-        keyLength: heliusApiKey ? heliusApiKey.length : 0,
-        envKeys: Object.keys(process.env).filter(k => k.includes('HELIUS') || k.includes('API'))
-      });
       
-      if (!heliusApiKey) {
-        console.error('HELIUS_API_KEY environment variable is not set');
-        return res.status(400).json({ 
-          success: false, 
-          error: 'Helius API requires an API key. Please configure HELIUS_API_KEY environment variable in Vercel.',
-          note: 'Get a free API key at https://www.helius.dev. After adding it, redeploy the backend.',
-          troubleshooting: '1. Go to Vercel Dashboard → Your Project → Settings → Environment Variables. 2. Add HELIUS_API_KEY. 3. Redeploy the backend.'
+      // Rate limiting: check if IP is rate limited
+      const clientIp = req.headers['x-forwarded-for']?.split(',')[0] || 
+                       req.headers['x-real-ip'] || 
+                       req.socket?.remoteAddress || 
+                       'unknown';
+      
+      if (!checkRateLimit(clientIp)) {
+        return res.status(429).json({
+          success: false,
+          error: 'Rate limit exceeded. Please wait a minute before trying again.',
+          retryAfter: 60
         });
       }
-      url = `https://api.helius.xyz/v0/addresses/${wallet}/transactions?api-key=${heliusApiKey}&limit=100`;
+      
+      try {
+        // Use multi-key system (Helius primary -> secondary -> RPC)
+        const result = await fetchWithHeliusKeys(wallet);
+        
+        // Transform result to match expected format
+        let transactions = result.data || [];
+        
+        // Ensure transactions are properly formatted
+        transactions = transactions.map(tx => {
+          // Ensure tokenTransfers is properly formatted
+          if (tx.tokenTransfers && Array.isArray(tx.tokenTransfers)) {
+            tx.tokenTransfers = tx.tokenTransfers.map(transfer => ({
+              mint: transfer.mint,
+              tokenSymbol: transfer.tokenSymbol || null,
+              tokenName: transfer.tokenName || null,
+              tokenAmount: transfer.tokenAmount || transfer.amount || 0,
+              priceUsd: transfer.priceUsd || 0,
+              fromUserAccount: transfer.fromUserAccount || false,
+              toUserAccount: transfer.toUserAccount || false,
+              from: transfer.fromTokenAccount,
+              to: transfer.toTokenAccount,
+            }));
+          }
+          return {
+            ...tx,
+            timestamp: tx.timestamp || tx.blockTime || Math.floor(Date.now() / 1000),
+            blockTime: tx.blockTime || tx.timestamp || Math.floor(Date.now() / 1000),
+          };
+        });
+        
+        // Return in format expected by frontend (array of transactions)
+        return res.status(200).json({
+          success: true,
+          data: transactions,
+          source: result.source || 'RPC',
+          rpcEndpoint: result.rpcEndpoint || null
+        });
+      } catch (error) {
+        console.error('Error in fetchWithHeliusKeys:', error);
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to fetch wallet transactions',
+          details: error.message,
+          source: 'ERROR'
+        });
+      }
     } else if (endpoint === 'birdeye') {
       if (!mint) {
         return res.status(400).json({ success: false, error: 'Mint address required' });
@@ -220,6 +638,97 @@ export default async function handler(req, res) {
       // Pump.fun API - try multiple endpoints
       // Note: Pump.fun may not have a public API, but we can try common patterns
       url = `https://frontend-api.pump.fun/coins/${mint}`;
+    } else if (endpoint === 'solana-balance') {
+      if (!wallet) {
+        return res.status(400).json({ success: false, error: 'Wallet address required' });
+      }
+      
+      // Handle balance fetch separately (before making URL-based requests)
+      let lamports = 0;
+      const rpcEndpoints = [
+        'https://api.mainnet-beta.solana.com',
+        'https://solana-api.projectserum.com',
+        'https://rpc.ankr.com/solana',
+        'https://solana.public-rpc.com',
+        'https://rpc.solana.com',
+      ];
+
+      // Try each RPC endpoint
+      for (const rpcUrl of rpcEndpoints) {
+        try {
+          const balanceResponse = await fetch(rpcUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 1,
+              method: 'getBalance',
+              params: [wallet],
+            }),
+          });
+          
+          if (balanceResponse.ok) {
+            const balanceData = await balanceResponse.json();
+            if (balanceData.result?.value !== undefined && balanceData.result?.value !== null) {
+              lamports = balanceData.result.value;
+              console.log(`Successfully fetched balance from ${rpcUrl}: ${lamports} lamports`);
+              break;
+            }
+          }
+        } catch (e) {
+          console.log(`RPC endpoint ${rpcUrl} failed:`, e.message);
+          continue;
+        }
+      }
+
+      // If all RPC endpoints failed, try Solscan API as fallback
+      if (lamports === 0) {
+        try {
+          const solscanResponse = await fetch(`https://api.solscan.io/account?address=${wallet}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Accept': 'application/json',
+            },
+          });
+          if (solscanResponse.ok) {
+            const solscanData = await solscanResponse.json();
+            if (solscanData.data?.lamports) {
+              lamports = solscanData.data.lamports;
+              console.log(`Successfully fetched balance from Solscan: ${lamports} lamports`);
+            }
+          }
+        } catch (e) {
+          console.log('Solscan fallback also failed:', e.message);
+        }
+      }
+
+      const sol = lamports / 1e9;
+      
+      // Fetch SOL price from CoinGecko
+      let solPrice = 150; // Default
+      try {
+        const priceResponse = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd');
+        if (priceResponse.ok) {
+          const priceData = await priceResponse.json();
+          if (priceData.solana?.usd) {
+            solPrice = priceData.solana.usd;
+          }
+        }
+      } catch (e) {
+        console.log('Error fetching SOL price:', e);
+      }
+
+      const usd = sol * solPrice;
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          lamports,
+          sol,
+          usd,
+          solPrice,
+        },
+      });
     }
 
     // Make API request

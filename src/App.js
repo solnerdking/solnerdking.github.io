@@ -3,13 +3,13 @@ import { Search } from 'lucide-react';
 import { differenceInDays } from 'date-fns';
 import { safeParseNumber, roundToDecimals } from './utils/numberFormatter';
 import GlassCard from './components/GlassCard';
-import LiveTicker from './components/LiveTicker';
 import DonationSupport from './components/DonationSupport';
 import Leaderboard from './components/Leaderboard';
 import SearchModal from './components/SearchModal';
 import exportService from './utils/exportService';
 import cacheService from './services/cacheService';
 import statsService from './services/statsService';
+import tokenListService from './services/tokenListService';
 import { Share2, Copy, Check, ExternalLink, BarChart3, ArrowLeft } from 'lucide-react';
 
 const SolanaAnalyzer = () => {
@@ -17,9 +17,8 @@ const SolanaAnalyzer = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [results, setResults] = useState(null);
-  const [activeTab, setActiveTab] = useState('paperhand');
+  const [activeTab, setActiveTab] = useState('paperhands');
   const [searchQuery] = useState('');
-  const [sortBy] = useState('missedGains');
   const [dateFilter] = useState('all');
   const [showSearchModal, setShowSearchModal] = useState(false);
   const [copiedAddress, setCopiedAddress] = useState('');
@@ -374,12 +373,44 @@ const SolanaAnalyzer = () => {
       setError('Please enter a valid Solana wallet address');
       return;
     }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:372',message:'fetchWalletData ENTRY',data:{walletAddress:walletAddress.trim(),walletAddressLength:walletAddress.trim().length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    
+    // Check cache first to avoid unnecessary API calls
+    const trimmedWallet = walletAddress.trim();
+    const cachedResult = cacheService.getCachedWalletAnalysis(trimmedWallet);
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:380',message:'cache check result',data:{hasCachedResult:!!cachedResult,trimmedWallet,walletAddress},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+    
+    if (cachedResult) {
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:383',message:'using cached result',data:{hasResults:!!cachedResult},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+      // #endregion
+      console.log('Using cached wallet analysis');
+      setResults(cachedResult);
+      setLoading(false);
+      setError('');
+      return;
+    }
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:392',message:'cache miss - making API call',data:{trimmedWallet},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    
     setLoading(true);
     setError('');
     setResults(null); // Clear previous results
     setSelectedToken(null); // Reset selected token when fetching new wallet
     try {
       const heliusResponse = await fetch(`${backendUrl}?endpoint=helius&wallet=${walletAddress}`);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:400',message:'helius response status',data:{status:heliusResponse.status,ok:heliusResponse.ok},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H3'})}).catch(()=>{});
+      // #endregion
       
       if (!heliusResponse.ok) {
         const errorText = await heliusResponse.text().catch(() => 'Could not read error');
@@ -391,10 +422,12 @@ const SolanaAnalyzer = () => {
         }
         
         let errorMessage = errorData.error || errorData.message || 'Failed to fetch wallet data';
-        if (heliusResponse.status === 403) {
+        if (heliusResponse.status === 401) {
+          errorMessage = 'API key authentication failed. Using alternative data source...';
+        } else if (heliusResponse.status === 403) {
           errorMessage = 'Helius API blocked the request. Please try again in a few minutes.';
         } else if (heliusResponse.status === 429) {
-          errorMessage = 'Too many requests. Please wait a moment and try again.';
+          errorMessage = 'Rate limit exceeded. Using alternative data source...';
         } else if (heliusResponse.status === 504) {
           errorMessage = 'Request timed out. Please try again.';
         }
@@ -408,38 +441,56 @@ const SolanaAnalyzer = () => {
         throw new Error('No data found');
       }
       
+      // Show info message if using fallback (non-blocking, just log)
+      if (heliusData.source === 'RPC') {
+        console.log('Using Solana RPC - service continues normally');
+      }
+      
       const transactions = heliusData.data;
       const allTokens = analyzeAllTokens(transactions);
 
-      // Enrich tokens with comprehensive metadata from multiple sources
+      // Pre-load Token List once for all tokens (optimization)
+      const tokenList = await tokenListService.loadTokenList();
+
+      // Enrich tokens with simplified data sources (DexScreener + Token List only)
       const enrichedTokens = await Promise.all(
         allTokens.map(async (token, tokenIndex) => {
+          // Check cache first
+          const cachedMetadata = cacheService.getCachedTokenMetadata(token.mint);
+          if (cachedMetadata) {
+            return { ...token, ...cachedMetadata };
+          }
+
           // Add small delay between tokens to avoid rate limiting
           if (tokenIndex > 0 && tokenIndex % 5 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 200));
+            await new Promise(resolve => setTimeout(resolve, 100));
           }
+
           let symbol = token.symbol || '';
           let name = token.name || '';
           let currentPrice = 0;
           let ath = 0;
           let athDate = null;
-          let platform = 'Solana';
-          let developerWallet = null;
-          let creatorWallet = null;
-          let website = null;
-          let twitter = null;
-          let telegram = null;
-          let description = null;
           let logoURI = null;
-          let isWrapped = false;
-          let wrappedTokenAddress = null;
-          let marketCap = 0;
-          let volume24h = 0;
-          let liquidity = 0;
           let verified = false;
           let decimals = 9;
-          
-          // Try DexScreener first for comprehensive token data
+          let liquidity = 0;
+
+          // 1. Try Token List FIRST (verified tokens - fastest, most reliable)
+          try {
+            const tokenFromList = tokenList?.find(t => t.address === token.mint);
+            if (tokenFromList) {
+              if (tokenFromList.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenFromList.symbol;
+              if (tokenFromList.name && (!name || name === 'Unknown Token')) name = tokenFromList.name;
+              if (tokenFromList.logoURI && !logoURI) logoURI = tokenFromList.logoURI;
+              if (tokenFromList.decimals) decimals = tokenFromList.decimals;
+              verified = true;
+            }
+          } catch (e) {
+            // Token list already loaded, ignore errors
+          }
+
+          // 2. Try DexScreener for price/ATH/liquidity (primary data source)
           try {
             const dexscreenerResponse = await fetch(`${backendUrl}?endpoint=dexscreener&mint=${token.mint}`);
             if (dexscreenerResponse.ok) {
@@ -447,230 +498,24 @@ const SolanaAnalyzer = () => {
               if (dexscreenerData.success && dexscreenerData.data) {
                 const tokenInfo = dexscreenerData.data;
                 
-                // Extract comprehensive data
-                if (tokenInfo.symbol) symbol = tokenInfo.symbol;
-                if (tokenInfo.name) name = tokenInfo.name;
+                if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
+                if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
                 if (tokenInfo.price?.usd) currentPrice = tokenInfo.price.usd;
                 if (tokenInfo.liquidity) liquidity = tokenInfo.liquidity;
-                if (tokenInfo.volume24h) volume24h = tokenInfo.volume24h;
-                if (tokenInfo.logoURI) logoURI = tokenInfo.logoURI;
+                if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
                 if (tokenInfo.history?.ath?.value) {
                   ath = tokenInfo.history.ath.value;
                   athDate = tokenInfo.history.ath.unixTime ? new Date(tokenInfo.history.ath.unixTime * 1000) : null;
                 }
               }
             }
-            // Suppress 404/400 errors - they're expected for some tokens
           } catch (e) {
             // Only log unexpected errors (not 404/400)
             if (e.message && !e.message.includes('404') && !e.message.includes('400')) {
-              console.log('DexScreener error for', token.mint.slice(0, 8), ':', e.message);
+              console.log(`[DexScreener] Error for ${token.mint.slice(0, 8)}:`, e.message);
             }
           }
-          
-          // Try BirdEye for price data and additional metadata
-          try {
-            const birdeyeResponse = await fetch(`${backendUrl}?endpoint=birdeye&mint=${token.mint}`);
-            if (birdeyeResponse.ok) {
-              const birdeyeData = await birdeyeResponse.json();
-              if (birdeyeData.success && birdeyeData.data) {
-                const tokenInfo = birdeyeData.data;
-                
-                // Extract price
-                if (!currentPrice) {
-                  currentPrice = tokenInfo.price?.usd || 
-                                (typeof tokenInfo.price === 'number' ? tokenInfo.price : 0) || 0;
-                }
-                
-                // Extract ATH
-                if (!ath) {
-                  ath = tokenInfo.history?.ath?.value || 
-                       (typeof tokenInfo.ath === 'number' ? tokenInfo.ath : 0) || 
-                       currentPrice || 0;
-                  athDate = tokenInfo.history?.ath?.unixTime ? new Date(tokenInfo.history.ath.unixTime * 1000) : null;
-                }
-                
-                // Update symbol and name if available and better
-                if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
-                if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
-                if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
-                if (tokenInfo.decimals) decimals = tokenInfo.decimals;
-              }
-            }
-            // Suppress 404/400 errors - they're expected for some tokens (e.g., SOL native)
-          } catch (e) {
-            // Only log unexpected errors (not 404/400)
-            if (e.message && !e.message.includes('404') && !e.message.includes('400')) {
-              console.log('BirdEye error for', token.mint.slice(0, 8), ':', e.message);
-          }
-          }
-          
-          // Try CoinGecko for comprehensive metadata (if available)
-          // Add delay to avoid rate limiting (429)
-          try {
-            await new Promise(resolve => setTimeout(resolve, 100 * (tokenIndex % 10))); // Stagger requests
-            const coingeckoResponse = await fetch(`${backendUrl}?endpoint=coingecko&mint=${token.mint}`);
-            if (coingeckoResponse.ok) {
-              const coingeckoData = await coingeckoResponse.json();
-              if (coingeckoData.success && coingeckoData.data) {
-                const tokenInfo = coingeckoData.data;
-                
-                // Extract comprehensive metadata
-                if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
-                if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
-                if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
-                if (tokenInfo.marketCap) marketCap = tokenInfo.marketCap;
-                if (tokenInfo.volume24h && !volume24h) volume24h = tokenInfo.volume24h;
-                if (tokenInfo.description) description = tokenInfo.description;
-                if (tokenInfo.links?.homepage?.[0]) website = tokenInfo.links.homepage[0];
-                if (tokenInfo.links?.twitter_screen_name) twitter = `https://twitter.com/${tokenInfo.links.twitter_screen_name}`;
-                if (tokenInfo.links?.telegram_channel_identifier) telegram = `https://t.me/${tokenInfo.links.telegram_channel_identifier}`;
-                if (tokenInfo.platforms?.solana) {
-                  platform = 'Solana';
-                  // Check if it's a wrapped token
-                  if (tokenInfo.platforms.ethereum || tokenInfo.platforms.bsc) {
-                    isWrapped = true;
-                    wrappedTokenAddress = tokenInfo.platforms.ethereum || tokenInfo.platforms.bsc;
-                  }
-                }
-              }
-            } else if (coingeckoResponse.status === 429) {
-              // Rate limited - skip silently
-            }
-            // Suppress 404/429 errors - they're expected
-          } catch (e) {
-            // Only log unexpected errors (not 404/429)
-            if (e.message && !e.message.includes('404') && !e.message.includes('429')) {
-              console.log('CoinGecko error for', token.mint.slice(0, 8), ':', e.message);
-            }
-          }
-          
-          // Try Solscan for developer/creator info
-          if ((!symbol || symbol === 'Unknown') || (!name || name === 'Unknown Token') || !developerWallet) {
-            try {
-              const solscanResponse = await fetch(`${backendUrl}?endpoint=solscan&mint=${token.mint}`);
-              if (solscanResponse.ok) {
-                const solscanData = await solscanResponse.json();
-                if (solscanData.success && solscanData.data) {
-                  const tokenInfo = solscanData.data;
-                  if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
-                  if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
-                  if (tokenInfo.creator || tokenInfo.authority) {
-                    developerWallet = tokenInfo.creator || tokenInfo.authority;
-                  }
-                  if (tokenInfo.owner) {
-                    creatorWallet = tokenInfo.owner;
-                  }
-                  if (tokenInfo.website) website = tokenInfo.website;
-                  if (tokenInfo.twitter) twitter = tokenInfo.twitter;
-                  if (tokenInfo.telegram) telegram = tokenInfo.telegram;
-                  if (tokenInfo.description) description = tokenInfo.description;
-                  if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
-                  if (tokenInfo.verified !== undefined) verified = tokenInfo.verified;
-                }
-              }
-              // Suppress 400/404 errors - they're expected for some tokens
-            } catch (e) {
-              // Only log unexpected errors (not 400/404)
-              if (e.message && !e.message.includes('400') && !e.message.includes('404')) {
-                console.log('Solscan error for', token.mint.slice(0, 8), ':', e.message);
-              }
-            }
-          }
-          
-          // Try Helius for token metadata and creator info
-          if ((!symbol || symbol === 'Unknown') || (!name || name === 'Unknown Token') || !developerWallet) {
-            try {
-              const heliusResponse = await fetch(`${backendUrl}?endpoint=helius-token&mint=${token.mint}`);
-              if (heliusResponse.ok) {
-                const heliusData = await heliusResponse.json();
-                if (heliusData.success && heliusData.data && Array.isArray(heliusData.data) && heliusData.data.length > 0) {
-                  const tokenInfo = heliusData.data[0];
-                  if (tokenInfo.onChainMetadata?.metadata?.data?.name && (!name || name === 'Unknown Token')) {
-                    name = tokenInfo.onChainMetadata.metadata.data.name;
-                  }
-                  if (tokenInfo.onChainMetadata?.metadata?.data?.symbol && (!symbol || symbol === 'Unknown')) {
-                    symbol = tokenInfo.onChainMetadata.metadata.data.symbol;
-                  }
-                  if (tokenInfo.onChainMetadata?.metadata?.data?.uri) {
-                    // Try to fetch off-chain metadata
-                    try {
-                      const metadataResponse = await fetch(tokenInfo.onChainMetadata.metadata.data.uri);
-                      if (metadataResponse.ok) {
-                        const metadata = await metadataResponse.json();
-                        if (metadata.name && (!name || name === 'Unknown Token')) name = metadata.name;
-                        if (metadata.symbol && (!symbol || symbol === 'Unknown')) symbol = metadata.symbol;
-                        if (metadata.description) description = metadata.description;
-                        if (metadata.image && !logoURI) logoURI = metadata.image;
-                        if (metadata.website) website = metadata.website;
-                        if (metadata.twitter) twitter = metadata.twitter;
-                        if (metadata.telegram) telegram = metadata.telegram;
-                        if (metadata.creators && metadata.creators.length > 0) {
-                          developerWallet = metadata.creators[0].address;
-                        }
-                      }
-                    } catch (e) {
-                      console.log('Metadata URI fetch error:', e);
-                    }
-                  }
-                  if (tokenInfo.mintAuthority && !developerWallet) {
-                    developerWallet = tokenInfo.mintAuthority;
-                  }
-                  if (tokenInfo.freezeAuthority && !creatorWallet) {
-                    creatorWallet = tokenInfo.freezeAuthority;
-                  }
-                }
-              }
-            } catch (e) {
-              console.log('Helius token error for', token.mint, ':', e);
-            }
-          }
-          
-          // Try Pump.fun for launchpad tokens (especially memecoins)
-          if (!logoURI || (!symbol || symbol === 'Unknown') || (!name || name === 'Unknown Token')) {
-            try {
-              const pumpfunResponse = await fetch(`${backendUrl}?endpoint=pumpfun&mint=${token.mint}`);
-              if (pumpfunResponse.ok) {
-                const pumpfunData = await pumpfunResponse.json();
-                if (pumpfunData.success && pumpfunData.data) {
-                  const tokenInfo = pumpfunData.data;
-                  if (tokenInfo.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenInfo.symbol;
-                  if (tokenInfo.name && (!name || name === 'Unknown Token')) name = tokenInfo.name;
-                  if (tokenInfo.logoURI && !logoURI) logoURI = tokenInfo.logoURI;
-                  if (tokenInfo.platform && platform === 'Solana') platform = tokenInfo.platform;
-                  if (tokenInfo.website && !website) website = tokenInfo.website;
-                  if (tokenInfo.twitter && !twitter) twitter = tokenInfo.twitter;
-                  if (tokenInfo.telegram && !telegram) telegram = tokenInfo.telegram;
-                  if (tokenInfo.description && !description) description = tokenInfo.description;
-                }
-              }
-              // Suppress 404/530 errors - they're expected for non-pump.fun tokens
-            } catch (e) {
-              // Only log unexpected errors (not 404/530)
-              if (e.message && !e.message.includes('404') && !e.message.includes('530')) {
-                console.log('Pump.fun error for', token.mint.slice(0, 8), ':', e.message);
-              }
-            }
-          }
-          
-          // Try Solana Token List for verified tokens
-          try {
-            const tokenListResponse = await fetch('https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json');
-            if (tokenListResponse.ok) {
-              const tokenListData = await tokenListResponse.json();
-              const tokenFromList = tokenListData.tokens?.find(t => t.address === token.mint);
-              if (tokenFromList) {
-                if (tokenFromList.symbol && (!symbol || symbol === 'Unknown')) symbol = tokenFromList.symbol;
-                if (tokenFromList.name && (!name || name === 'Unknown Token')) name = tokenFromList.name;
-                if (tokenFromList.logoURI && !logoURI) logoURI = tokenFromList.logoURI;
-                verified = true;
-                if (tokenFromList.decimals) decimals = tokenFromList.decimals;
-              }
-            }
-          } catch (e) {
-            console.log('Token list error:', e);
-          }
-          
+
           // Final fallback: use mint address
           if (!symbol || symbol === 'Unknown') {
             symbol = token.mint.slice(0, 4).toUpperCase();
@@ -678,27 +523,20 @@ const SolanaAnalyzer = () => {
           if (!name || name === 'Unknown Token') {
             name = `${symbol} Token`;
           }
-          
+
           // Use transaction prices if available and > 0
-          // Only use current price as fallback if we have no transaction price data
-          // This ensures we don't use inaccurate estimates
           let finalBuyPrice = token.avgBuyPrice > 0 ? token.avgBuyPrice : 0;
           let finalSellPrice = token.avgSellPrice > 0 ? token.avgSellPrice : 0;
-          
-          // Only use current price as fallback if:
-          // 1. We have no transaction price data AND
-          // 2. We have a valid current price from API
-          // This prevents using $0 or inaccurate prices
+
+          // Only use current price as fallback if we have no transaction price data
           if (finalBuyPrice === 0 && currentPrice > 0 && token.buyCount === 0) {
-            // Only use as fallback if we never had a buy price
             finalBuyPrice = currentPrice;
           }
           if (finalSellPrice === 0 && currentPrice > 0 && token.sellCount === 0) {
-            // Only use as fallback if we never had a sell price
             finalSellPrice = currentPrice;
           }
-          
-          return { 
+
+          const enrichedToken = { 
             ...token, 
             symbol: symbol,
             name: name,
@@ -707,23 +545,16 @@ const SolanaAnalyzer = () => {
             athDate: athDate,
             avgBuyPrice: finalBuyPrice,
             avgSellPrice: finalSellPrice,
-            // Enhanced metadata
-            platform: platform,
-            developerWallet: developerWallet,
-            creatorWallet: creatorWallet,
-            website: website,
-            twitter: twitter,
-            telegram: telegram,
-            description: description,
             logoURI: logoURI,
-            isWrapped: isWrapped,
-            wrappedTokenAddress: wrappedTokenAddress,
-            marketCap: marketCap,
-            volume24h: volume24h,
-            liquidity: liquidity,
             verified: verified,
             decimals: decimals,
+            liquidity: liquidity,
           };
+
+          // Cache the metadata for future use
+          cacheService.cacheTokenMetadata(token.mint, enrichedToken);
+
+          return enrichedToken;
         })
       );
 
@@ -805,7 +636,14 @@ const SolanaAnalyzer = () => {
       };
 
       // Cache the results
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:632',message:'caching wallet analysis',data:{walletAddress:walletAddress.trim(),hasResultsData:!!resultsData,tokenCount:resultsData?.allTokens?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
       cacheService.cacheWalletAnalysis(walletAddress.trim(), resultsData);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7243/ingest/a26cdc5f-d73f-4028-8b75-616d869592b7',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.js:637',message:'cache saved',data:{walletAddress:walletAddress.trim()},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'H4'})}).catch(()=>{});
+      // #endregion
 
       setResults(resultsData);
       
@@ -897,21 +735,8 @@ const SolanaAnalyzer = () => {
     
     let filtered = results.allTokens;
     
-    // Apply tab filter
-    switch (activeTab) {
-      case 'paperhand':
-        filtered = filtered.filter(t => t.status === 'sold');
-        break;
-      case 'roundtrip':
-        filtered = filtered.filter(t => t.status === 'partial');
-        break;
-      case 'gained':
-        filtered = filtered.filter(t => t.status === 'held' || t.status === 'never_sold');
-        break;
-      default:
-        // Show all for dashboard
-        break;
-    }
+    // Apply tab filter - only sold tokens for all tabs
+    filtered = filtered.filter(t => t.status === 'sold');
     
     // Apply search filter
     if (searchQuery.trim()) {
@@ -938,23 +763,34 @@ const SolanaAnalyzer = () => {
       });
     }
     
-    // Sort
+    // Sort based on active tab
     filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'roi':
-          return (b.roiIfHeldCurrent || 0) - (a.roiIfHeldCurrent || 0);
-        case 'holdTime':
-          return (b.timeHeldDays || 0) - (a.timeHeldDays || 0);
-        case 'symbol':
-          return (a.symbol || '').localeCompare(b.symbol || '');
-        case 'missedGains':
+      switch (activeTab) {
+        case 'paperhands':
+          // Sort by missedGainsATH (potential loss if held to ATH)
+          return (b.missedGainsATH || 0) - (a.missedGainsATH || 0);
+        case 'mostprofit':
+          // Sort by actual profit (actualProceeds - totalCost) descending
+          const profitA = (a.actualProceeds || 0) - (a.totalCost || 0);
+          const profitB = (b.actualProceeds || 0) - (b.totalCost || 0);
+          return profitB - profitA;
+        case 'biggestloss':
+          // Sort by actual loss (actualProceeds - totalCost) ascending (most negative first)
+          const lossA = (a.actualProceeds || 0) - (a.totalCost || 0);
+          const lossB = (b.actualProceeds || 0) - (b.totalCost || 0);
+          return lossA - lossB;
         default:
-          return (b.missedGainsCurrent || 0) - (a.missedGainsCurrent || 0);
+          return (b.missedGainsATH || 0) - (a.missedGainsATH || 0);
       }
     });
     
+    // Limit to Top 10 for PaperHands tab
+    if (activeTab === 'paperhands') {
+      filtered = filtered.slice(0, 10);
+    }
+    
     return filtered;
-  }, [results, activeTab, searchQuery, sortBy, dateFilter]);
+  }, [results, activeTab, searchQuery, dateFilter]);
 
 
   // Enhanced image component with multiple fallbacks including pump.fun and launchpads
@@ -1035,9 +871,9 @@ const SolanaAnalyzer = () => {
   TokenImage.displayName = 'TokenImage';
 
   const tabs = [
-    { id: 'paperhand', label: 'JitterHands', description: 'Tokens sold too early - missed gains' },
-    { id: 'roundtrip', label: 'RoundTrip', description: 'Partially sold tokens - roundtrip analysis' },
-    { id: 'gained', label: 'Gained', description: 'Currently held tokens - profit/loss tracking' },
+    { id: 'paperhands', label: 'PaperHands', description: 'Top 10 tokens sold too early - potential loss if held to ATH' },
+    { id: 'mostprofit', label: 'Most Profit', description: 'Top trades with highest profit (actual proceeds - cost)' },
+    { id: 'biggestloss', label: 'Biggest Loss', description: 'Top trades with biggest loss (actual proceeds - cost)' },
   ];
 
 
@@ -1046,14 +882,7 @@ const SolanaAnalyzer = () => {
     const fullToken = results?.allTokens?.find(t => t.mint === token.mint) || token;
     setSelectedToken(fullToken);
     
-    // Automatically switch to the correct tab based on token status
-    if (fullToken.status === 'sold') {
-      setActiveTab('paperhand');
-    } else if (fullToken.status === 'partial') {
-      setActiveTab('roundtrip');
-    } else if (fullToken.status === 'held' || fullToken.status === 'never_sold') {
-      setActiveTab('gained');
-    }
+    // Keep current tab (all tabs show sold tokens)
     
     // Scroll to top when clicked
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1071,34 +900,39 @@ const SolanaAnalyzer = () => {
     let isGain = false;
     let isLoss = false;
     
-    if (activeTab === 'paperhand') {
-      // JitterHands: Show missed gains (always a loss)
-      displayValue = token.missedGainsCurrent || 0;
-      displayLabel = `(${(token.roiIfHeldCurrent || 0).toFixed(2)}%)`;
-      solAmount = (token.missedGainsCurrent || 0) / solPrice;
+    if (activeTab === 'paperhands') {
+      // PaperHands: Show missed gains at ATH (always a loss)
+      displayValue = token.missedGainsATH || 0;
+      const roiIfHeldATH = token.roiIfHeldATH || 0;
+      displayLabel = `(${roiIfHeldATH.toFixed(2)}%)`;
+      solAmount = (token.missedGainsATH || 0) / solPrice;
       isLoss = true;
-    } else if (activeTab === 'roundtrip') {
-      // RoundTrip: Show roundtripped value
-      displayValue = token.actualProceeds || 0;
-      const roundtripResult = displayValue - (token.totalCost || 0);
-      displayLabel = `(${(token.roi || 0).toFixed(2)}%)`;
-      solAmount = (token.actualProceeds || 0) / solPrice;
-      if (roundtripResult > 0) {
+    } else if (activeTab === 'mostprofit') {
+      // Most Profit: Show actual profit (actualProceeds - totalCost)
+      const profit = (token.actualProceeds || 0) - (token.totalCost || 0);
+      displayValue = profit;
+      const roi = token.roi || 0;
+      displayLabel = `(${roi >= 0 ? '+' : ''}${roi.toFixed(2)}%)`;
+      solAmount = profit / solPrice;
+      if (profit > 0) {
         isGain = true;
-      } else if (roundtripResult < 0) {
+      } else if (profit < 0) {
         isLoss = true;
       }
+    } else if (activeTab === 'biggestloss') {
+      // Biggest Loss: Show actual loss (actualProceeds - totalCost, negative values)
+      const loss = (token.actualProceeds || 0) - (token.totalCost || 0);
+      displayValue = Math.abs(loss); // Show absolute value for display
+      const roi = token.roi || 0;
+      displayLabel = `(${roi.toFixed(2)}%)`;
+      solAmount = Math.abs(loss) / solPrice;
+      isLoss = true; // Always a loss in this tab
     } else {
-      // Gained: Show current value/gains
-      displayValue = token.currentValue || 0;
-      const gains = (token.currentValue || 0) - (token.totalCost || 0);
-      displayLabel = gains >= 0 ? `(+${((gains / (token.totalCost || 1)) * 100).toFixed(2)}%)` : `(${((gains / (token.totalCost || 1)) * 100).toFixed(2)}%)`;
-      solAmount = (token.currentValue || 0) / solPrice;
-      if (gains > 0) {
-        isGain = true;
-      } else if (gains < 0) {
-        isLoss = true;
-      }
+      // Fallback (shouldn't happen)
+      displayValue = token.missedGainsATH || 0;
+      displayLabel = `(${(token.roiIfHeldATH || 0).toFixed(2)}%)`;
+      solAmount = (token.missedGainsATH || 0) / solPrice;
+      isLoss = true;
     }
     
     const formatValue = (val) => {
@@ -1191,11 +1025,13 @@ const SolanaAnalyzer = () => {
             <span className={`text-xs ml-2 font-normal ${
               isGain ? 'text-green-400/70' : isLoss ? 'text-red-400/70' : 'text-gray-500'
             }`}>
-              {activeTab === 'paperhand' 
-                ? '• Missed gains'
-                : activeTab === 'roundtrip'
-                ? '• Roundtripped value'
-                : '• Current value'}
+              {activeTab === 'paperhands' 
+                ? '• Missed gains (ATH)'
+                : activeTab === 'mostprofit'
+                ? '• Profit'
+                : activeTab === 'biggestloss'
+                ? '• Loss'
+                : '• Value'}
             </span>
           </p>
           <p className={`${isGain ? 'text-green-400' : isLoss ? 'text-red-400' : 'text-white'} text-sm`}>
@@ -1327,10 +1163,6 @@ const SolanaAnalyzer = () => {
         </div>
       </div>
 
-      {/* Live Ticker */}
-      {!showLeaderboard && results && results.allTokens && results.allTokens.length > 0 && (
-        <LiveTicker tokens={results.allTokens} onTokenClick={handleTokenClick} />
-      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
         {/* Leaderboard View */}
@@ -1579,24 +1411,17 @@ const SolanaAnalyzer = () => {
                   let title, titleDescription, tokenAmount, usdValue, contractAddress, platform, tokenSymbol, tokenName;
                   let gridCards = [];
                   
-                  if (activeTab === 'paperhand') {
-                    // JitterHands: Show selected token's data (or biggest miss if no selection)
+                  if (activeTab === 'paperhands') {
+                    // PaperHands: Show selected token's data (or biggest miss if no selection)
                     const tokenToShow = displayToken;
-                    const totalMissedGains = tokenToShow?.missedGainsCurrent || 0;
+                    const totalMissedGains = tokenToShow?.missedGainsATH || 0;
                     const totalMissedGainsSOL = totalMissedGains / solPrice;
                     const boughtCost = tokenToShow?.totalCost || 0;
                     const soldProceeds = tokenToShow?.actualProceeds || 0;
                     const netResult = soldProceeds - boughtCost;
                     
-                    // Check if value at reference price is still below buy cost
-                    // Reference price value = tokensSold × referencePriceAfterSell
-                    // We need to calculate this from the missed gains calculation
-                    const tokensSold = tokenToShow?.totalSold || 0;
-                    const referencePriceAfterSell = tokenToShow?.referencePriceAfterSell || 0;
-                    const valueAtReferencePrice = tokensSold * referencePriceAfterSell;
-                    
                     title = 'You JitterHanded';
-                    titleDescription = 'Tokens you sold too early - showing missed post-sale upside (not guaranteed profit)';
+                    titleDescription = 'Tokens you sold too early - potential loss if held to ATH';
                     tokenAmount = tokenToShow?.totalSold || 0;
                     usdValue = totalMissedGains;
                     contractAddress = tokenToShow?.mint;
@@ -1626,8 +1451,8 @@ const SolanaAnalyzer = () => {
                       },
                       { 
                         label: 'Fumbled', 
-                        description: 'Potential gains you missed by selling early',
-                        tooltip: 'Additional value your tokens reached after you sold, compared to what you received. This represents missed post-sale upside (not guaranteed profit).',
+                        description: 'Potential gains you missed by selling early (if held to ATH)',
+                        tooltip: 'Additional value your tokens reached at ATH after you sold, compared to what you received. This represents missed post-sale upside (not guaranteed profit).',
                         sol: totalMissedGainsSOL, 
                         usd: totalMissedGains,
                         isGain: false,
@@ -1642,22 +1467,19 @@ const SolanaAnalyzer = () => {
                         isLoss: false
                       },
                     ];
-                  } else if (activeTab === 'roundtrip') {
-                    // RoundTrip: Show selected token or first roundtrip token
+                  } else if (activeTab === 'mostprofit') {
+                    // Most Profit: Show selected token with highest profit
                     const tokenToShow = displayToken;
-                    const totalRoundtripped = tokenToShow?.totalSold || 0;
-                    const totalRoundtrippedValue = tokenToShow?.actualProceeds || 0;
-                    const totalRoundtrippedSOL = totalRoundtrippedValue / solPrice;
-                    const totalBoughtValueRoundtrip = tokenToShow?.totalCost || 0;
-                    const athMcap = tokenToShow?.marketCap || tokenToShow?.ath * (tokenToShow?.totalBought || 0) || 0;
-                    const nowWorth = tokenToShow?.currentValue || 0;
-                    const roundtripResult = totalRoundtrippedValue - totalBoughtValueRoundtrip;
-                    const currentVsBought = nowWorth - totalBoughtValueRoundtrip;
+                    const boughtCost = tokenToShow?.totalCost || 0;
+                    const soldProceeds = tokenToShow?.actualProceeds || 0;
+                    const profit = soldProceeds - boughtCost;
+                    const profitSOL = profit / solPrice;
+                    const roi = tokenToShow?.roi || 0;
                     
-                    title = 'Total Roundtripped';
-                    titleDescription = 'Tokens you partially sold - showing roundtrip value';
-                    tokenAmount = totalRoundtripped;
-                    usdValue = totalRoundtrippedValue;
+                    title = 'Most Profit';
+                    titleDescription = 'Highest profit trade (actual proceeds - cost)';
+                    tokenAmount = tokenToShow?.totalSold || 0;
+                    usdValue = profit;
                     contractAddress = tokenToShow?.mint;
                     platform = tokenToShow?.platform;
                     tokenSymbol = tokenToShow?.symbol || 'Unknown';
@@ -1666,52 +1488,54 @@ const SolanaAnalyzer = () => {
                     gridCards = [
                       { 
                         label: 'Bought with', 
-                        description: 'Total amount invested in this token',
-                        sol: totalBoughtValueRoundtrip / solPrice, 
-                        usd: totalBoughtValueRoundtrip,
+                        description: 'Total amount spent to buy these tokens',
+                        tooltip: 'Total SOL spent to buy these tokens',
+                        sol: boughtCost / solPrice, 
+                        usd: boughtCost,
                         isGain: false,
                         isLoss: false
                       },
                       { 
-                        label: 'ATH mcap', 
-                        description: 'All-time high market capitalization',
-                        value: `$${(athMcap / 1000000).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}M`,
-                        isGain: false,
+                        label: 'Sold for', 
+                        description: 'Amount received when you sold',
+                        tooltip: 'Total SOL received when you sold',
+                        sol: soldProceeds / solPrice, 
+                        usd: soldProceeds,
+                        isGain: true,
                         isLoss: false
                       },
                       { 
-                        label: 'Roundtripped', 
-                        description: 'Value of tokens you sold (partial exit)',
-                        sol: totalRoundtrippedSOL, 
-                        usd: totalRoundtrippedValue,
-                        isGain: roundtripResult > 0,
-                        isLoss: roundtripResult < 0,
-                        isBreakeven: roundtripResult === 0
+                        label: 'Profit', 
+                        description: 'Profit from this trade',
+                        tooltip: 'Profit = Sold for - Bought with',
+                        sol: profitSOL, 
+                        usd: profit,
+                        isGain: true,
+                        isLoss: false
                       },
                       { 
-                        label: 'Now worth', 
-                        description: 'Current value of remaining holdings',
-                        value: `$${nowWorth.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-                        isGain: currentVsBought > 0,
-                        isLoss: currentVsBought < 0,
-                        isBreakeven: currentVsBought === 0
+                        label: 'ROI', 
+                        description: 'Return on investment percentage',
+                        tooltip: 'ROI percentage for this trade',
+                        value: `${roi >= 0 ? '+' : ''}${roi.toFixed(2)}%`,
+                        isGain: profit > 0,
+                        isLoss: profit < 0,
+                        isBreakeven: profit === 0
                       },
                     ];
-                  } else {
-                    // Gained: Show selected token or first gained token
+                  } else if (activeTab === 'biggestloss') {
+                    // Biggest Loss: Show selected token with biggest loss
                     const tokenToShow = displayToken;
-                    const totalGained = tokenToShow?.currentHeld || 0;
-                    const totalGainedValue = tokenToShow?.currentValue || 0;
-                    const totalGainedSOL = totalGainedValue / solPrice;
-                    const totalInvestedGained = tokenToShow?.totalCost || 0;
-                    const totalInvestedGainedSOL = totalInvestedGained / solPrice;
-                    const totalGains = totalGainedValue - totalInvestedGained;
-                    const avgHoldTime = tokenToShow?.timeHeldDays || 0;
+                    const boughtCost = tokenToShow?.totalCost || 0;
+                    const soldProceeds = tokenToShow?.actualProceeds || 0;
+                    const loss = soldProceeds - boughtCost;
+                    const lossSOL = Math.abs(loss) / solPrice;
+                    const roi = tokenToShow?.roi || 0;
                     
-                    title = 'Total Gained';
-                    titleDescription = 'Tokens you still hold - showing current gains/losses';
-                    tokenAmount = totalGained;
-                    usdValue = totalGainedValue;
+                    title = 'Biggest Loss';
+                    titleDescription = 'Biggest loss trade (actual proceeds - cost)';
+                    tokenAmount = tokenToShow?.totalSold || 0;
+                    usdValue = Math.abs(loss);
                     contractAddress = tokenToShow?.mint;
                     platform = tokenToShow?.platform;
                     tokenSymbol = tokenToShow?.symbol || 'Unknown';
@@ -1719,39 +1543,56 @@ const SolanaAnalyzer = () => {
                     
                     gridCards = [
                       { 
-                        label: 'Invested', 
-                        description: 'Total amount you spent buying these tokens',
-                        sol: totalInvestedGainedSOL, 
-                        usd: totalInvestedGained,
+                        label: 'Bought with', 
+                        description: 'Total amount spent to buy these tokens',
+                        tooltip: 'Total SOL spent to buy these tokens',
+                        sol: boughtCost / solPrice, 
+                        usd: boughtCost,
                         isGain: false,
                         isLoss: false
                       },
                       { 
-                        label: 'Now worth', 
-                        description: 'Current market value of your holdings',
-                        sol: totalGainedSOL, 
-                        usd: totalGainedValue,
-                        isGain: totalGains > 0,
-                        isLoss: totalGains < 0,
-                        isBreakeven: totalGains === 0
-                      },
-                      { 
-                        label: 'Gains', 
-                        description: 'Profit or loss from your investment',
-                        sol: totalGains / solPrice, 
-                        usd: totalGains,
-                        isGain: totalGains > 0,
-                        isLoss: totalGains < 0,
-                        isBreakeven: totalGains === 0
-                      },
-                      { 
-                        label: 'Avg held', 
-                        description: 'Average number of days you\'ve held',
-                        value: `${avgHoldTime} ${avgHoldTime === 1 ? 'Day' : 'Days'}`,
+                        label: 'Sold for', 
+                        description: 'Amount received when you sold',
+                        tooltip: 'Total SOL received when you sold',
+                        sol: soldProceeds / solPrice, 
+                        usd: soldProceeds,
                         isGain: false,
-                        isLoss: false
+                        isLoss: true
+                      },
+                      { 
+                        label: 'Loss', 
+                        description: 'Loss from this trade',
+                        tooltip: 'Loss = Sold for - Bought with',
+                        sol: lossSOL, 
+                        usd: Math.abs(loss),
+                        isGain: false,
+                        isLoss: true
+                      },
+                      { 
+                        label: 'ROI', 
+                        description: 'Return on investment percentage',
+                        tooltip: 'ROI percentage for this trade',
+                        value: `${roi.toFixed(2)}%`,
+                        isGain: false,
+                        isLoss: true
                       },
                     ];
+                  } else {
+                    // Fallback (shouldn't happen)
+                    const tokenToShow = displayToken;
+                    const totalMissedGains = tokenToShow?.missedGainsATH || 0;
+                    
+                    title = 'PaperHands';
+                    titleDescription = 'Tokens you sold too early';
+                    tokenAmount = tokenToShow?.totalSold || 0;
+                    usdValue = totalMissedGains;
+                    contractAddress = tokenToShow?.mint;
+                    platform = tokenToShow?.platform;
+                    tokenSymbol = tokenToShow?.symbol || 'Unknown';
+                    tokenName = tokenToShow?.name || 'Unknown Token';
+                    
+                    gridCards = [];
                   }
                   
                   const formatTokenAmount = (amount) => {
@@ -1767,11 +1608,13 @@ const SolanaAnalyzer = () => {
                   };
                   
                   // Determine color for main value based on gain/loss
-                  const mainValueColor = activeTab === 'paperhand' 
+                  const mainValueColor = activeTab === 'paperhands' 
                     ? 'text-red-500' // Missed gains = loss (red)
-                    : activeTab === 'roundtrip'
-                    ? (usdValue > 0 ? 'text-green-500' : usdValue < 0 ? 'text-red-500' : 'text-white')
-                    : (usdValue > 0 ? 'text-green-500' : usdValue < 0 ? 'text-red-500' : 'text-white');
+                    : activeTab === 'mostprofit'
+                    ? 'text-green-500' // Profit = green
+                    : activeTab === 'biggestloss'
+                    ? 'text-red-500' // Loss = red
+                    : 'text-white';
                   
                   return (
                 <div className="space-y-4">
